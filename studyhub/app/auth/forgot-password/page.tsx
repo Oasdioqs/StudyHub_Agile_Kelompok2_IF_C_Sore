@@ -6,20 +6,36 @@ import Link from 'next/link'
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const isValid = email.includes('@')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!isValid) return
 
     setLoading(true)
+    setError('')
+    setSuccess('')
 
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.message)
+
       setSuccess('Link reset password sudah dikirim ke email kamu 📩')
+    } catch (err: any) {
+      setError(err.message || 'Terjadi kesalahan')
+    } finally {
       setLoading(false)
-    }, 1500)
+    }
   }
 
   return (
@@ -34,9 +50,16 @@ export default function ForgotPasswordPage() {
           </div>
           <h4 className="fw-bold mb-1">Lupa Password?</h4>
           <p className="text-muted small">
-            Tenang, kami bantu kamu reset password ✨
+            Masukkan email kamu, kami kirim link reset 🔐
           </p>
         </div>
+
+        {/* ERROR */}
+        {error && (
+          <div className="alert alert-danger py-2 small text-center">
+            {error}
+          </div>
+        )}
 
         {/* SUCCESS */}
         {success && (
@@ -54,7 +77,7 @@ export default function ForgotPasswordPage() {
               <input
                 type="email"
                 className="form-control input-modern"
-                placeholder="nama@email.com"
+                placeholder="contoh@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -100,7 +123,7 @@ export default function ForgotPasswordPage() {
           max-width: 420px;
           width: 100%;
           border-radius: 22px;
-          background: rgba(255,255,255,0.8);
+          background: rgba(255,255,255,0.85);
           backdrop-filter: blur(16px);
           box-shadow: 0 20px 60px rgba(0,0,0,0.15);
         }
@@ -129,7 +152,7 @@ export default function ForgotPasswordPage() {
           transform: scale(1.02);
         }
 
-        /* 🔥 SAME BUTTON AS LOGIN */
+        /* 🔥 BUTTON STYLE SAMA LOGIN */
         .btn-modern {
           display: block;
           padding: 12px;
