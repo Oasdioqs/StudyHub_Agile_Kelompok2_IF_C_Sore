@@ -29,10 +29,8 @@ export async function POST(req: Request) {
     )
   }
 
-  // 🔐 hash password baru
   const hashedPassword = await bcrypt.hash(password, 12)
 
-  // 💾 update password + hapus token
   await db.user.update({
     where: { id: user.id },
     data: {

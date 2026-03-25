@@ -10,7 +10,7 @@ const navItems = [
   { href: '/tasks',      icon: 'bi-check2-square',    label: 'Tugas' },
   { href: '/notes',      icon: 'bi-journal-text',     label: 'Catatan' },
   { href: '/forum',      icon: 'bi-chat-dots',        label: 'Forum Diskusi' },
-  { href: '/ai-tutor',   icon: 'bi-robot',            label: 'AI Tutor' },
+  { href: '/ai-tutor',   icon: 'bi-robot',            label: 'StudyHub AI' },
   { href: '/timer',      icon: 'bi-alarm',            label: 'Pomodoro Timer' },
   { href: '/profile',    icon: 'bi-person-circle',    label: 'Profil Saya' },
 ]

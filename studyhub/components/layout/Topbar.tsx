@@ -7,7 +7,7 @@ const titles: Record<string, string> = {
   '/tasks': 'Manajemen Tugas',
   '/notes': 'Catatan Digital',
   '/forum': 'Forum Diskusi',
-  '/ai-tutor': 'AI Tutor',
+  '/ai-tutor': 'Chat dengan AI',
   '/timer': 'Pomodoro Timer',
   '/profile': 'Profil Saya',
 }

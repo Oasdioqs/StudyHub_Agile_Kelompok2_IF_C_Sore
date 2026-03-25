@@ -1,15 +1,12 @@
-// app/dashboard/page.tsx
+// app/api/dashboard/stats/route.ts
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { redirect } from 'next/navigation'
-import Sidebar from '@/components/layout/Sidebar'
-import Topbar from '@/components/layout/Topbar'
-import DashboardClient from '@/components/dashboard/DashboardClient'
+import { NextResponse } from 'next/server'
 
-export default async function DashboardPage() {
+export async function GET() {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) redirect('/auth/login')
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const userId = session.user.id
 
@@ -50,30 +47,13 @@ export default async function DashboardPage() {
   const doneToday  = completedTodayTasks.length
   const progress   = totalToday === 0 ? 100 : Math.round((doneToday / totalToday) * 100)
 
-  const firstName = session.user.name?.split(' ')[0] ?? 'Kamu'
-  const today = new Date().toLocaleDateString('id-ID', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  return NextResponse.json({
+    todayTasks,
+    doneToday,
+    totalToday,
+    progress,
+    upcomingCount:  upcomingTasks.length,
+    recentNotes,
+    unreadNotifs,
   })
-
-  return (
-    <div style={{ background: '#f4f2ee', minHeight: '100vh' }}>
-      <Sidebar />
-      <div className="app-main">
-        <Topbar />
-        <DashboardClient
-          firstName={firstName}
-          today={today}
-          initial={{
-            todayTasks,
-            doneToday,
-            totalToday,
-            progress,
-            upcomingCount: upcomingTasks.length,
-            recentNotes,
-            unreadNotifs,
-          }}
-        />
-      </div>
-    </div>
-  )
 }

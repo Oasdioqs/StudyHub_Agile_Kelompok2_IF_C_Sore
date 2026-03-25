@@ -10,7 +10,6 @@ import { useRive } from '@rive-app/react-canvas'
 export default function RegisterPage() {
   const router = useRouter()
 
-  // 🐻 RIVE
   const { rive, RiveComponent } = useRive({
     src: '/bear.riv',
     stateMachines: 'Login Machine',
@@ -58,7 +57,6 @@ export default function RegisterPage() {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  // 🔥 VALIDATION
   const isValid =
     form.name.length > 2 &&
     form.email.includes('@') &&
@@ -81,12 +79,12 @@ export default function RegisterPage() {
         password: form.password,
       })
 
-      inputs.successTrigger?.fire() // 🐻 senang
+      inputs.successTrigger?.fire()
       setSuccess('Akun berhasil dibuat! 🎉')
 
       setLoading(false)
     } catch (err: any) {
-      inputs.failTrigger?.fire() // 🐻 sedih
+      inputs.failTrigger?.fire()
       setError(err.response?.data?.message || 'Terjadi kesalahan.')
       setLoading(false)
     }
