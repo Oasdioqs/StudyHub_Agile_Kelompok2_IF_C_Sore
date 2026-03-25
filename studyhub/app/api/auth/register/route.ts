@@ -18,6 +18,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Email sudah digunakan' }, { status: 409 })
   }
 
+  const existingName = await db.user.findFirst({ where: { name } })
+  if (existingName) {
+    return NextResponse.json({ message: 'Nama sudah digunakan' }, { status: 409 })
+  }
+
   const hashed = await bcrypt.hash(password, 12)
   const user = await db.user.create({
     data: { name, email, password: hashed },

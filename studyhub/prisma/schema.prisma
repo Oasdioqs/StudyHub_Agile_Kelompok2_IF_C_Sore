@@ -38,6 +38,9 @@ model User {
   notifications Notification[]
   aiSessions    AISession[]
 
+  resetToken       String? 
+  resetTokenExpiry DateTime?
+
   @@map("users")
 }
 
