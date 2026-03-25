@@ -485,9 +485,12 @@ Didistribusikan di bawah **MIT License** — bebas digunakan, dimodifikasi, dan 
 
 ## 👨‍💻 Tim
 
-| Nama | Role | Kontak |
+| Nama | Role | NIM |
 |------|------|--------|
-| Kelvin Chen | Project Lead / Full-stack Dev | kelvin.chen996@gmail.com |
+|  | Project Lead / Full-stack Dev | kelvin.chen996@gmail.com |
+|  | Project Lead / Full-stack Dev | kelvin.chen996@gmail.com |
+|  | Project Lead / Full-stack Dev | kelvin.chen996@gmail.com |
+| Steven Aurelio | Anggota | 201111110 |
 
 ---
 
