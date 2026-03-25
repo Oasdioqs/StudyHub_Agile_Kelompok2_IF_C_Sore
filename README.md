@@ -261,8 +261,8 @@ Pastikan sudah terinstall di komputer kamu:
 ### Langkah 1 — Clone Repository
 
 ```bash
-git clone https://github.com/USERNAME/studyhub.git
-cd studyhub
+git clone https://github.com/Oasdioqs/Agile_kelompok_2_IF-C-Sore.git
+cd Agile_kelompok_2_IF-C-Sore/studyhub
 ```
 
 ### Langkah 2 — Install Dependencies
@@ -273,6 +273,14 @@ npm install
 
 Semua library di `package.json` akan terinstall otomatis.
 
+### JIKA ANDA MENGALAMIN EROR KETIKA "NPM INSTALL"
+```
+npm : File C:\Program Files\nodejs\npm.ps1 cannot be loaded because running scripts is disabled on this system. For more information, see about_Execution_Policies at https:/go.microsoft.com/fwlink/?LinkID=135170. At line:1 char:1 + npm install + ~~~ + CategoryInfo : SecurityError: (:) [], P SSecurityException + FullyQualifiedErrorId : UnauthorizedAccess
+```
+```bash
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
 ### Langkah 3 — Setup Environment Variables
 
 ```bash
@@ -280,8 +288,11 @@ cp .env.example .env.local
 ```
 
 Buka `.env.local` dan isi konfigurasi (lihat bagian [Environment Variables](#-environment-variables)).
+Link Databasenya ke postgres
+### Langkah 4
+npm install @next-auth/prisma-adapter next-auth
 
-### Langkah 4 — Setup Database
+### Langkah 5 — Setup Database
 
 ```bash
 # Generate Prisma client dari schema
@@ -291,7 +302,7 @@ npx prisma generate
 npx prisma migrate dev --name init
 ```
 
-### Langkah 5 — Jalankan Development Server
+### Langkah 6 — Jalankan Development Server
 
 ```bash
 npm run dev
