@@ -1,0 +1,126 @@
+/* styles/globals.css */
+:root {
+  --sh-primary: #4f46e5;
+  --sh-primary-dark: #3730a3;
+  --sh-secondary: #0ea5e9;
+  --sh-accent: #10b981;
+  --sh-danger: #ef4444;
+  --sh-warning: #f59e0b;
+  --sh-bg: #f8fafc;
+  --sh-sidebar-width: 260px;
+}
+
+/* Bootstrap overrides */
+.btn-primary {
+  background-color: var(--sh-primary) !important;
+  border-color: var(--sh-primary) !important;
+}
+.btn-primary:hover {
+  background-color: var(--sh-primary-dark) !important;
+  border-color: var(--sh-primary-dark) !important;
+}
+.text-primary { color: var(--sh-primary) !important; }
+.bg-primary { background-color: var(--sh-primary) !important; }
+.border-primary { border-color: var(--sh-primary) !important; }
+
+/* Layout */
+body { background-color: var(--sh-bg); }
+
+.app-sidebar {
+  width: var(--sh-sidebar-width);
+  min-height: 100vh;
+  background: #fff;
+  border-right: 1px solid #e2e8f0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  overflow-y: auto;
+}
+
+.app-main {
+  margin-left: var(--sh-sidebar-width);
+  min-height: 100vh;
+  padding: 0;
+}
+
+@media (max-width: 768px) {
+  .app-sidebar { transform: translateX(-100%); transition: transform 0.3s; }
+  .app-sidebar.open { transform: translateX(0); }
+  .app-main { margin-left: 0; }
+}
+
+/* Cards */
+.card {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+.card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; }
+
+/* Sidebar nav */
+.sidebar-nav .nav-link {
+  color: #64748b;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 2px 0;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+.sidebar-nav .nav-link:hover,
+.sidebar-nav .nav-link.active {
+  background-color: #ede9fe;
+  color: var(--sh-primary);
+}
+.sidebar-nav .nav-link i {
+  width: 20px;
+  font-size: 16px;
+}
+
+/* Priority badges */
+.badge-HIGH { background-color: #fee2e2; color: #dc2626; }
+.badge-MEDIUM { background-color: #fef3c7; color: #d97706; }
+.badge-LOW { background-color: #d1fae5; color: #059669; }
+
+/* Status badges */
+.badge-TODO { background-color: #f1f5f9; color: #64748b; }
+.badge-IN_PROGRESS { background-color: #dbeafe; color: #2563eb; }
+.badge-DONE { background-color: #d1fae5; color: #059669; }
+
+/* Timer circle */
+.timer-circle {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  border: 6px solid var(--sh-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  background: #ede9fe;
+}
+
+/* Streak badge */
+.streak-badge {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: white;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* AI chat */
+.chat-bubble-user {
+  background-color: var(--sh-primary);
+  color: white;
+  border-radius: 18px 18px 4px 18px;
+  max-width: 75%;
+}
+.chat-bubble-ai {
+  background-color: #f1f5f9;
+  color: #1e293b;
+  border-radius: 18px 18px 18px 4px;
+  max-width: 85%;
+}
