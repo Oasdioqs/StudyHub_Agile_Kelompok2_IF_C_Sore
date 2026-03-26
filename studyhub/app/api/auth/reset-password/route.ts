@@ -12,7 +12,6 @@ export async function POST(req: Request) {
     )
   }
 
-  // 🔍 cari user berdasarkan token + belum expired
   const user = await db.user.findFirst({
     where: {
       resetToken: token,

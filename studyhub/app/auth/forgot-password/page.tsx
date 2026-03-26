@@ -26,9 +26,17 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email }),
       })
 
-      const data = await res.json()
+      const text = await res.text()
+      let data: any = null
+      try {
+        data = JSON.parse(text)
+      } catch {
+        data = null
+      }
 
-      if (!res.ok) throw new Error(data.message)
+      if (!res.ok) {
+        throw new Error(data?.message || 'Gagal mengirim link reset.')
+      }
 
       setSuccess('Link reset password sudah dikirim ke email kamu 📩')
     } catch (err: any) {

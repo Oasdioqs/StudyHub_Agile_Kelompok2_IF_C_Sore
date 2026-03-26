@@ -1,8 +1,14 @@
-// app/api/dashboard/stats/route.ts
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { getDashboardHistory, saveDashboardDay } from '@/lib/dashboard-days'
 import { NextResponse } from 'next/server'
+
+function calculateProgress(doneToday: number, totalToday: number, penaltyPercent: number) {
+  if (totalToday <= 0) return 0
+  const base = Math.round((doneToday / totalToday) * 100)
+  return Math.max(0, base - penaltyPercent)
+}
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -15,24 +21,42 @@ export async function GET() {
 
   const [
     todayTasks,
-    completedTodayTasks,
     upcomingTasks,
+    doneTodayCount,
+    overdueTasks,
+    upcomingDueTasks,
+    completedLateToday,
     recentNotes,
+    latestNotifs,
     unreadNotifs,
+    history,
   ] = await Promise.all([
     db.task.findMany({
       where: { userId, deadline: { gte: todayStart, lte: todayEnd } },
-      select: { id: true, title: true, subject: true, priority: true, status: true },
+      select: { id: true, title: true, description: true, subject: true, deadline: true, priority: true, status: true },
     }),
     db.task.findMany({
-      where: { userId, status: 'DONE', deadline: { gte: todayStart, lte: todayEnd } },
-      select: { id: true },
-    }),
-    db.task.findMany({
-      where: { userId, status: { not: 'DONE' }, deadline: { gte: new Date() } },
+      where: { userId, deadline: { gt: todayEnd } },
       orderBy: { deadline: 'asc' },
-      take: 5,
-      select: { id: true },
+      take: 12,
+      select: { id: true, title: true, subject: true, deadline: true, priority: true, status: true },
+    }),
+    db.task.count({
+      where: { userId, status: 'DONE', deadline: { gte: todayStart, lte: todayEnd } },
+    }),
+    db.task.count({
+      where: { userId, status: { not: 'DONE' }, deadline: { lt: new Date() } },
+    }),
+    db.task.count({
+      where: { userId, status: { not: 'DONE' }, deadline: { gt: todayEnd } },
+    }),
+    db.task.count({
+      where: {
+        userId,
+        status: 'DONE',
+        deadline: { lt: todayStart },
+        updatedAt: { gte: todayStart, lte: todayEnd },
+      },
     }),
     db.note.findMany({
       where: { userId },
@@ -40,20 +64,50 @@ export async function GET() {
       take: 4,
       select: { id: true, title: true, content: true },
     }),
+    db.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, type: true, title: true, message: true, isRead: true, createdAt: true },
+    }),
     db.notification.count({ where: { userId, isRead: false } }),
+    getDashboardHistory(userId),
   ])
 
   const totalToday = todayTasks.length
-  const doneToday  = completedTodayTasks.length
-  const progress   = totalToday === 0 ? 100 : Math.round((doneToday / totalToday) * 100)
+  const doneToday = doneTodayCount
+  const totalTasksOverall = totalToday
+  const doneTasksOverall = doneToday
+  const totalActiveTasks = Math.max(0, totalToday - doneToday)
+  const todayPendingTasks = Math.max(0, totalToday - doneToday)
+  const missedDeadlineCount = overdueTasks + completedLateToday
+  const progressPenaltyPercent = missedDeadlineCount > 0 ? 10 : 0
+  const progress   = calculateProgress(doneToday, totalToday, progressPenaltyPercent)
+  await saveDashboardDay(userId, new Date(), {
+    totalTasks: totalToday,
+    doneTasks: doneToday,
+    pendingTasks: todayPendingTasks,
+    overdueTasks,
+    progress,
+  })
 
   return NextResponse.json({
     todayTasks,
+    upcomingTasks,
     doneToday,
     totalToday,
+    doneOverall: doneTasksOverall,
+    totalOverall: totalTasksOverall,
+    totalActive: totalActiveTasks,
+    todayPending: todayPendingTasks,
+    upcomingDue: upcomingDueTasks,
+    missedDeadlineCount,
+    progressPenaltyPercent,
     progress,
-    upcomingCount:  upcomingTasks.length,
+    overdueCount: overdueTasks,
     recentNotes,
+    latestNotifs,
     unreadNotifs,
+    history,
   })
 }

@@ -1,4 +1,3 @@
-// app/api/timer/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -20,7 +19,6 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  // Award 15 points per completed pomodoro session
   if (type === 'pomodoro') {
     await db.user.update({
       where: { id: session.user.id },

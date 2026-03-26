@@ -1,4 +1,3 @@
-// hooks/useDashboardStream.ts
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -7,16 +6,42 @@ export interface DashboardStats {
   todayTasks: {
     id: string
     title: string
+    description?: string | null
     subject?: string | null
+    deadline?: string | Date | null
+    priority: 'HIGH' | 'MEDIUM' | 'LOW'
+    status: string
+  }[]
+  upcomingTasks: {
+    id: string
+    title: string
+    subject?: string | null
+    deadline?: string | Date | null
     priority: 'HIGH' | 'MEDIUM' | 'LOW'
     status: string
   }[]
   doneToday:     number
   totalToday:    number
+  doneOverall:   number
+  totalOverall:  number
+  totalActive:   number
+  todayPending:  number
+  upcomingDue:   number
+  missedDeadlineCount: number
+  progressPenaltyPercent: number
   progress:      number
-  upcomingCount: number
+  overdueCount:  number
   recentNotes:   { id: string; title: string; content: string }[]
+  latestNotifs:  { id: string; type: string; title: string; message: string; isRead: boolean; createdAt: string | Date }[]
   unreadNotifs:  number
+  history: {
+    date: string | Date
+    totalTasks: number
+    doneTasks: number
+    pendingTasks: number
+    overdueTasks: number
+    progress: number
+  }[]
 }
 
 type Status = 'connecting' | 'live' | 'reconnecting' | 'offline'
@@ -24,8 +49,10 @@ type Status = 'connecting' | 'live' | 'reconnecting' | 'offline'
 export function useDashboardStream(initial: DashboardStats) {
   const [stats, setStats]   = useState<DashboardStats>(initial)
   const [status, setStatus] = useState<Status>('connecting')
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(Date.now())
   const esRef    = useRef<EventSource | null>(null)
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const healthRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const attempt  = useRef(0)
 
   const connect = () => {
@@ -45,6 +72,7 @@ export function useDashboardStream(initial: DashboardStats) {
         const data: DashboardStats = JSON.parse(e.data)
         setStats(data)
         setStatus('live')
+        setLastUpdatedAt(Date.now())
       } catch { /* ignore parse errors */ }
     }
 
@@ -70,9 +98,26 @@ export function useDashboardStream(initial: DashboardStats) {
     return () => {
       esRef.current?.close()
       if (retryRef.current) clearTimeout(retryRef.current)
+      if (healthRef.current) clearInterval(healthRef.current)
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 
-  return { stats, status }
+  useEffect(() => {
+    if (healthRef.current) clearInterval(healthRef.current)
+    healthRef.current = setInterval(() => {
+      const age = Date.now() - lastUpdatedAt
+      if (age > 12000 && age <= 30000) {
+        setStatus((prev) => (prev === 'offline' ? prev : 'reconnecting'))
+      } else if (age > 30000) {
+        setStatus('offline')
+      }
+    }, 3000)
+
+    return () => {
+      if (healthRef.current) clearInterval(healthRef.current)
+    }
+  }, [lastUpdatedAt])
+
+  return { stats, status, lastUpdatedAt }
 }

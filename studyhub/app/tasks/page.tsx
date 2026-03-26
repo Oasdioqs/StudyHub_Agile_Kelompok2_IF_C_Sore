@@ -1,7 +1,8 @@
 'use client'
-// app/tasks/page.tsx
+
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import { useSearchParams } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import Topbar from '@/components/layout/Topbar'
 
@@ -16,44 +17,67 @@ const priorityLabel = { HIGH: 'Tinggi', MEDIUM: 'Sedang', LOW: 'Rendah' }
 const statusLabel = { TODO: 'Belum', IN_PROGRESS: 'Proses', DONE: 'Selesai' }
 
 export default function TasksPage() {
+  const searchParams = useSearchParams()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState({ status: '', priority: '' })
+  const [filter, setFilter] = useState({ status: '', priority: '', q: '' })
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', deadline: '', priority: 'MEDIUM', subject: '' })
   const [saving, setSaving] = useState(false)
 
-  const fetchTasks = async () => {
-    setLoading(true)
+  const fetchTasks = async (withLoading = true) => {
+    if (withLoading) setLoading(true)
     const params = new URLSearchParams()
     if (filter.status) params.set('status', filter.status)
     if (filter.priority) params.set('priority', filter.priority)
+    if (filter.q.trim()) params.set('q', filter.q.trim())
     const { data } = await axios.get(`/api/tasks?${params}`)
-    setTasks(data)
-    setLoading(false)
+    const qLower = filter.q.trim().toLowerCase()
+    const filtered = qLower
+      ? (data as Task[]).filter((task) =>
+          [task.title, task.description ?? '', task.subject ?? '']
+            .join(' ')
+            .toLowerCase()
+            .includes(qLower)
+        )
+      : data
+    setTasks(filtered)
+    if (withLoading) setLoading(false)
   }
 
-  useEffect(() => { fetchTasks() }, [filter])
+  useEffect(() => {
+    const status = searchParams.get('status') ?? ''
+    const priority = searchParams.get('priority') ?? ''
+    const q = searchParams.get('q') ?? ''
+    setFilter((prev) =>
+      prev.status === status && prev.priority === priority && prev.q === q ? prev : { status, priority, q }
+    )
+  }, [searchParams])
+
+  useEffect(() => { fetchTasks(true) }, [filter])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    await axios.post('/api/tasks', form)
+    const { data } = await axios.post('/api/tasks', form)
+    setTasks(prev => [data, ...prev])
     setSaving(false)
     setShowModal(false)
     setForm({ title: '', description: '', deadline: '', priority: 'MEDIUM', subject: '' })
-    fetchTasks()
+    fetchTasks(false)
   }
 
   const handleStatus = async (id: string, status: string) => {
+    setTasks(prev => prev.map(t => (t.id === id ? { ...t, status: status as Task['status'] } : t)))
     await axios.patch(`/api/tasks/${id}`, { status })
-    fetchTasks()
+    fetchTasks(false)
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm('Hapus tugas ini?')) return
+    setTasks(prev => prev.filter(t => t.id !== id))
     await axios.delete(`/api/tasks/${id}`)
-    fetchTasks()
+    fetchTasks(false)
   }
 
   const priorityBadge: Record<string, string> = {

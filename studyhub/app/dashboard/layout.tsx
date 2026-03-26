@@ -1,4 +1,3 @@
-// app/dashboard/layout.tsx - shared by all app pages
 import Sidebar from '@/components/layout/Sidebar'
 import Topbar from '@/components/layout/Topbar'
 

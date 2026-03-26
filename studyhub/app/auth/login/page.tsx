@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { signIn } from 'next-auth/react'
+import { useState, useEffect, useRef } from 'react'
+import { getSession, signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useRive } from '@rive-app/react-canvas'
@@ -38,10 +38,20 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [step] = useState<'login'>('login')
   const [showPassword, setShowPassword] = useState(false)
 
   const setVal = (input: any, val: any) => {
     if (input) input.value = val
+  }
+
+  const waitForSession = async (tries = 8, delayMs = 250) => {
+    for (let i = 0; i < tries; i += 1) {
+      const session = await getSession().catch(() => null)
+      if (session?.user?.id) return true
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+    return false
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,28 +67,35 @@ export default function LoginPage() {
         email,
         password,
         redirect: false,
+        callbackUrl: '/dashboard',
       })
 
       if (!result || result.error) {
-        inputs.failTrigger?.fire()
-        setError('Email atau password salah.')
-        setLoading(false)
-      } else {
-        inputs.successTrigger?.fire()
-        setSuccess('Login berhasil!')
-        setLoading(false)
-
-        setTimeout(() => {
-          router.push('/dashboard')
-        }, 1500)
+        inputs.failTrigger?.fire?.()
+        throw new Error('Email atau password salah.')
       }
-    } catch {
-      setError('Terjadi error.')
+
+      inputs.successTrigger?.fire?.()
+      setSuccess('Login berhasil!')
+
+      const hasSession = await waitForSession(10, 300)
+      if (!hasSession || !result?.url) {
+        throw new Error('Session belum siap. Coba sekali lagi.')
+      }
+      if (typeof window !== 'undefined') {
+        window.location.replace(result.url)
+      }
+      return
+    } catch (err: any) {
+      setError(err?.message || 'Terjadi error.')
+    } finally {
       setLoading(false)
     }
   }
 
-  const isValid = email.includes('@') && password.length >= 8
+  const isEmailValid = email.includes('@')
+  const isLoginValid = isEmailValid && password.length >= 8
+  const isOtpValid = false
 
   return (
     <div className="login-wrapper">
@@ -109,7 +126,6 @@ export default function LoginPage() {
 
         {/* FORM */}
         <form onSubmit={handleSubmit}>
-          
           {/* EMAIL */}
           <div className="mb-3">
             <label className="form-label small fw-semibold">Email</label>
@@ -162,12 +178,11 @@ export default function LoginPage() {
           </div>
 
           {/* BUTTON */}
-          <button className={`btn btn-modern w-100 fw-semibold ${!isValid ? 'btn-disabled' : ''}`} disabled={!isValid || loading || !!success}>
-            {success
-              ? 'Menuju Dashboard...'
-              : loading
-              ? 'Memproses...'
-              : 'Masuk'}
+          <button
+            className={`btn btn-modern w-100 fw-semibold ${!isLoginValid ? 'btn-disabled' : ''}`}
+            disabled={!isLoginValid || loading || !!success}
+          >
+            {success ? 'Menuju Dashboard...' : loading ? 'Memproses...' : 'Masuk'}
           </button>
         </form>
         <br></br>
@@ -199,6 +214,7 @@ export default function LoginPage() {
       <style jsx>{`
         .login-wrapper {
           min-height: 100vh;
+          min-height: 100dvh;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -274,6 +290,49 @@ export default function LoginPage() {
           border-color: #6366f1;
           box-shadow: 0 0 0 4px rgba(99,102,241,0.15);
           transform: scale(1.02);
+        }
+
+        .otp-input-shell {
+          display: grid;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 10px;
+          margin-top: 4px;
+          cursor: text;
+        }
+
+        .otp-box {
+          height: 52px;
+          border-radius: 12px;
+          border: 1.5px solid #d1d5db;
+          background: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 22px;
+          font-weight: 700;
+          color: #111827;
+          transition: all 0.2s ease;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+        }
+
+        .otp-box.filled {
+          border-color: #6366f1;
+          background: #eef2ff;
+          color: #4338ca;
+        }
+
+        .otp-box.ok {
+          border-color: #22c55e;
+          background: #ecfdf3;
+          color: #15803d;
+        }
+
+        .otp-hidden-input {
+          position: absolute;
+          opacity: 0;
+          pointer-events: none;
+          width: 1px;
+          height: 1px;
         }
 
         /* BUTTON */

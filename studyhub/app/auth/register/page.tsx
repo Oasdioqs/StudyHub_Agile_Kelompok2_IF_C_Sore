@@ -53,6 +53,12 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const fireRiveTrigger = (trigger: any) => {
+    if (trigger && typeof trigger.fire === 'function') {
+      trigger.fire()
+    }
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
@@ -79,12 +85,12 @@ export default function RegisterPage() {
         password: form.password,
       })
 
-      inputs.successTrigger?.fire()
-      setSuccess('Akun berhasil dibuat! 🎉')
+      fireRiveTrigger(inputs?.successTrigger)
+      setSuccess('Akun berhasil dibuat! 🎉 Cek email kamu untuk verifikasi sebelum login.')
 
       setLoading(false)
     } catch (err: any) {
-      inputs.failTrigger?.fire()
+      fireRiveTrigger(inputs?.failTrigger)
       setError(err.response?.data?.message || 'Terjadi kesalahan.')
       setLoading(false)
     }

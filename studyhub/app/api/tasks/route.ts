@@ -1,4 +1,3 @@
-// app/api/tasks/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -11,12 +10,20 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
   const priority = searchParams.get('priority')
+  const q = searchParams.get('q')?.trim()
 
   const tasks = await db.task.findMany({
     where: {
       userId: session.user.id,
       ...(status && { status: status as any }),
       ...(priority && { priority: priority as any }),
+      ...(q && {
+        OR: [
+          { title: { contains: q, mode: 'insensitive' as const } },
+          { description: { contains: q, mode: 'insensitive' as const } },
+          { subject: { contains: q, mode: 'insensitive' as const } },
+        ],
+      }),
     },
     orderBy: [{ priority: 'asc' }, { deadline: 'asc' }, { createdAt: 'desc' }],
   })
@@ -33,22 +40,31 @@ export async function POST(req: NextRequest) {
 
   if (!title) return NextResponse.json({ error: 'Judul wajib diisi' }, { status: 400 })
 
-  const task = await db.task.create({
-    data: {
-      title,
-      description,
-      deadline: deadline ? new Date(deadline) : null,
-      priority: priority ?? 'MEDIUM',
-      subject,
-      userId: session.user.id,
-    },
-  })
-
-  // Award points for creating a task
-  await db.user.update({
-    where: { id: session.user.id },
-    data: { points: { increment: 2 } },
-  })
+  const [task] = await db.$transaction([
+    db.task.create({
+      data: {
+        title,
+        description,
+        deadline: deadline ? new Date(deadline) : null,
+        priority: priority ?? 'MEDIUM',
+        subject,
+        userId: session.user.id,
+      },
+    }),
+    db.user.update({
+      where: { id: session.user.id },
+      data: { points: { increment: 2 } },
+    }),
+    db.notification.create({
+      data: {
+        userId: session.user.id,
+        type: 'TASK_CREATED',
+        title: 'Tugas baru ditambahkan',
+        message: `Tugas "${title}" berhasil ditambahkan${deadline ? ` (deadline ${new Date(deadline).toLocaleString('id-ID')})` : ''}.`,
+        link: '/tasks',
+      },
+    }),
+  ])
 
   return NextResponse.json(task, { status: 201 })
 }

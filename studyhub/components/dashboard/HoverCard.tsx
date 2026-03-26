@@ -73,6 +73,9 @@ export function TaskItem({
   badgeBg,
   badgeText,
   badgeLabel,
+  done,
+  onClick,
+  centerInfo,
 }: {
   title: string
   subject?: string | null
@@ -80,10 +83,14 @@ export function TaskItem({
   badgeBg: string
   badgeText: string
   badgeLabel: string
+  done?: boolean
+  onClick?: () => void
+  centerInfo?: string
 }) {
   const [hovered, setHovered] = useState(false)
   return (
     <li
+      onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -93,16 +100,22 @@ export function TaskItem({
         padding: '11px 16px',
         borderBottom: '0.5px solid rgba(0,0,0,0.04)',
         transition: '0.15s',
-        background: hovered ? '#f9f8ff' : undefined,
-        cursor: 'default',
+        background: hovered ? '#f9f8ff' : done ? '#fafafa' : undefined,
+        cursor: onClick ? 'pointer' : 'default',
         listStyle: 'none',
+        opacity: done ? 0.76 : 1,
       }}
     >
       <div style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flexShrink: 0 }} />
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>
-        {subject && <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 1 }}>{subject}</div>}
+        <div style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: done ? 'line-through' : 'none' }}>{title}</div>
+        {subject && <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 1, textDecoration: done ? 'line-through' : 'none' }}>{subject}</div>}
       </div>
+      {centerInfo && (
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: '#3730a3', background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 999, padding: '2px 7px', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+          {centerInfo}
+        </span>
+      )}
       <span style={{ fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 999, background: badgeBg, color: badgeText, flexShrink: 0 }}>
         {badgeLabel}
       </span>

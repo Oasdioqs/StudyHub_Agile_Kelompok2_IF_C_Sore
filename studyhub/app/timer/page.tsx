@@ -1,5 +1,5 @@
 'use client'
-// app/timer/page.tsx
+
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import Sidebar from '@/components/layout/Sidebar'
@@ -60,7 +60,6 @@ export default function TimerPage() {
       })
       if (mode === 'pomodoro') setSessions(s => s + 1)
       fetchHistory()
-      // Browser notification
       if (Notification.permission === 'granted') {
         new Notification('StudyHub Timer', {
           body: mode === 'pomodoro' ? '✅ Sesi fokus selesai! Waktunya istirahat.' : '⏰ Istirahat selesai! Ayo kembali fokus.',

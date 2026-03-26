@@ -1,4 +1,3 @@
-// lib/auth.ts
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
@@ -14,17 +13,21 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/login',
   },
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+      ? [
+          GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null
 
         const user = await db.user.findUnique({
@@ -41,6 +44,18 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === 'google' && user?.email) {
+        const existing = await db.user.findUnique({ where: { email: user.email } })
+        if (existing && !existing.emailVerified) {
+          await db.user.update({
+            where: { id: existing.id },
+            data: { emailVerified: new Date() },
+          })
+        }
+      }
+      return true
+    },
     async jwt({ token, user }) {
       if (user) token.id = user.id
       return token

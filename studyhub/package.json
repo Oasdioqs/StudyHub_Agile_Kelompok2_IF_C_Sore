@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
   },
@@ -19,8 +19,11 @@
     "bootstrap-icons": "^1.11.3",
     "chart.js": "^4.4.3",
     "date-fns": "^3.6.0",
+    "highlight.js": "^11.11.1",
     "next": "14.2.5",
     "next-auth": "^4.24.13",
+    "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^5.5.207",
     "react": "^18.3.1",
     "react-bootstrap": "^2.10.4",
     "react-chartjs-2": "^5.2.0",

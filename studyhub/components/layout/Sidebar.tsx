@@ -1,9 +1,9 @@
 'use client'
-// components/layout/Sidebar.tsx
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
+import { useState } from 'react'
 
 const navItems = [
   { href: '/dashboard',  icon: 'bi-house-door',       label: 'Dashboard' },
@@ -18,6 +18,21 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  const handleLogout = async () => {
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null)
+      await signOut({ redirect: false })
+    } finally {
+      if (typeof window !== 'undefined') {
+        window.location.replace('/auth/login')
+      }
+      setLoggingOut(false)
+    }
+  }
 
   return (
     <aside className="app-sidebar d-flex flex-column p-3">
@@ -27,7 +42,7 @@ export default function Sidebar() {
           style={{ width: 36, height: 36, background: '#4f46e5' }}>
           <i className="bi bi-book-half text-white" style={{ fontSize: 16 }}></i>
         </div>
-        <span className="fw-bold fs-5" style={{ color: '#1e293b' }}>StudyHub</span>
+        <span className="fw-bold fs-5 brand-text" style={{ color: '#1e293b' }}>StudyHub</span>
       </div>
 
       {/* Nav */}
@@ -39,7 +54,7 @@ export default function Sidebar() {
             className={`nav-link d-flex align-items-center gap-2 ${pathname === item.href ? 'active' : ''}`}
           >
             <i className={`bi ${item.icon}`}></i>
-            <span>{item.label}</span>
+            <span className="nav-label">{item.label}</span>
           </Link>
         ))}
       </nav>
@@ -62,7 +77,7 @@ export default function Sidebar() {
                 {session.user.name?.charAt(0).toUpperCase()}
               </div>
             )}
-            <div style={{ overflow: 'hidden' }}>
+            <div className="user-meta" style={{ overflow: 'hidden' }}>
               <div className="fw-semibold text-truncate" style={{ fontSize: 13 }}>
                 {session.user.name}
               </div>
@@ -72,12 +87,13 @@ export default function Sidebar() {
             </div>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: '/auth/login' })}
+            onClick={handleLogout}
+            disabled={loggingOut}
             className="btn btn-sm btn-outline-secondary w-100"
             style={{ fontSize: 13 }}
           >
             <i className="bi bi-box-arrow-right me-1"></i>
-            Keluar
+            <span className="logout-label">{loggingOut ? 'Keluar...' : 'Keluar'}</span>
           </button>
         </div>
       )}

@@ -1,6 +1,3 @@
-// prisma/schema.prisma
-// Jalankan: npx prisma migrate dev --name init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,52 +8,69 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  name        String
-  email       String   @unique
-  password    String?
-  image       String?
-  bio         String?
-  institution String?
-  major       String?
-  points      Int      @default(0)
-  streak      Int      @default(0)
-  lastActiveAt DateTime?
-  emailVerified DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  accounts      Account[]
-  sessions      Session[]
-  tasks         Task[]
-  notes         Note[]
-  groupMembers  GroupMember[]
-  threads       Thread[]
-  replies       Reply[]
-  flashcardSets FlashcardSet[]
-  timerSessions TimerSession[]
-  notifications Notification[]
-  aiSessions    AISession[]
-
-  resetToken       String? 
+  id               String         @id @default(cuid())
+  name             String
+  email            String         @unique
+  password         String?
+  image            String?
+  bio              String?
+  institution      String?
+  major            String?
+  points           Int            @default(0)
+  streak           Int            @default(0)
+  lastActiveAt     DateTime?
+  emailVerified    DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  resetToken       String?
   resetTokenExpiry DateTime?
+  accounts         Account[]
+  aiSessions       AISession[]
+  flashcardSets    FlashcardSet[]
+  groupMembers     GroupMember[]
+  notes            Note[]
+  notifications    Notification[]
+  replies          Reply[]
+  sessions         Session[]
+  tasks            Task[]
+  threads          Thread[]
+  timerSessions    TimerSession[]
+  loginOtps        LoginOtp[]
+  dashboardDays    DashboardDay[]
 
   @@map("users")
 }
 
-// NextAuth models
+model DashboardDay {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date         DateTime
+  totalTasks   Int      @default(0)
+  doneTasks    Int      @default(0)
+  pendingTasks Int      @default(0)
+  overdueTasks Int      @default(0)
+  progress     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("dashboard_days")
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -83,7 +97,19 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// App models
+model LoginOtp {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  lastSentAt DateTime @default(now())
+  provider   String // "credentials" | "google"
+
+  @@map("login_otps")
+}
+
 model Task {
   id          String     @id @default(cuid())
   title       String
@@ -93,52 +119,39 @@ model Task {
   status      TaskStatus @default(TODO)
   subject     String?
   userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("tasks")
-}
-
-enum Priority {
-  HIGH
-  MEDIUM
-  LOW
-}
-
-enum TaskStatus {
-  TODO
-  IN_PROGRESS
-  DONE
 }
 
 model Note {
   id        String   @id @default(cuid())
   title     String
-  content   String   @db.Text
+  content   String
   tags      String[]
   isShared  Boolean  @default(false)
   userId    String
   groupId   String?
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  group     Group?   @relation(fields: [groupId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  group     Group?   @relation(fields: [groupId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notes")
 }
 
 model Group {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   name        String
   description String?
-  inviteCode  String   @unique @default(cuid())
+  inviteCode  String        @unique @default(cuid())
   subject     String?
-  maxMembers  Int      @default(30)
-  createdAt   DateTime @default(now())
-
-  members GroupMember[]
-  notes   Note[]
+  maxMembers  Int           @default(30)
+  createdAt   DateTime      @default(now())
+  members     GroupMember[]
+  notes       Note[]
 
   @@map("groups")
 }
@@ -149,47 +162,41 @@ model GroupMember {
   groupId  String
   role     GroupRole @default(MEMBER)
   joinedAt DateTime  @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, groupId])
   @@map("group_members")
 }
 
-enum GroupRole {
-  ADMIN
-  MEMBER
-}
-
 model Thread {
   id        String   @id @default(cuid())
   title     String
-  content   String   @db.Text
+  content   String
   subject   String?
   tags      String[]
   upvotes   Int      @default(0)
   views     Int      @default(0)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  replies   Reply[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  replies   Reply[]
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("threads")
 }
 
 model Reply {
   id           String   @id @default(cuid())
-  content      String   @db.Text
+  content      String
   upvotes      Int      @default(0)
   isBestAnswer Boolean  @default(false)
   userId       String
   threadId     String
   parentId     String?
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  thread       Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
+  thread       Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("replies")
 }
@@ -200,9 +207,9 @@ model FlashcardSet {
   subject    String?
   isPublic   Boolean     @default(false)
   userId     String
+  createdAt  DateTime    @default(now())
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   flashcards Flashcard[]
-  createdAt  DateTime    @default(now())
 
   @@map("flashcard_sets")
 }
@@ -220,13 +227,13 @@ model Flashcard {
 
 model TimerSession {
   id          String   @id @default(cuid())
-  duration    Int      // in seconds
-  type        String   @default("pomodoro") // pomodoro | break
+  duration    Int
+  type        String   @default("pomodoro")
   taskId      String?
   taskTitle   String?
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   completedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("timer_sessions")
 }
@@ -236,23 +243,40 @@ model AISession {
   title     String   @default("New Chat")
   messages  Json     @default("[]")
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("ai_sessions")
 }
 
 model Notification {
   id        String   @id @default(cuid())
-  type      String   // deadline | reply | group_invite | badge
+  type      String
   title     String
   message   String
   isRead    Boolean  @default(false)
   link      String?
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum GroupRole {
+  ADMIN
+  MEMBER
 }

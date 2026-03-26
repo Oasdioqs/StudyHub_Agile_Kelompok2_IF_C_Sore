@@ -1,4 +1,3 @@
-// app/api/auth/register/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
@@ -25,7 +24,12 @@ export async function POST(req: NextRequest) {
 
   const hashed = await bcrypt.hash(password, 12)
   const user = await db.user.create({
-    data: { name, email, password: hashed },
+    data: {
+      name,
+      email,
+      password: hashed,
+      emailVerified: new Date(),
+    },
     select: { id: true, name: true, email: true },
   })
 
