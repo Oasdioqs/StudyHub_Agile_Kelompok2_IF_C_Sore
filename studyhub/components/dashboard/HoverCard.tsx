@@ -66,6 +66,131 @@ export function QuickLinkCard({
   )
 }
 
+export function ScheduleQuickLinkCard({
+  href,
+  emoji,
+  label,
+  desc,
+  iconBg,
+  infoTitle,
+  infoBody,
+}: {
+  href: string
+  emoji: string
+  label: string
+  desc: string
+  iconBg: string
+  infoTitle: string
+  infoBody: string
+}) {
+  const [hovered, setHovered] = useState(false)
+  const [infoOpen, setInfoOpen] = useState(false)
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'stretch',
+          gap: 0,
+          background: '#fff',
+          borderRadius: 14,
+          border: '0.5px solid rgba(0,0,0,0.06)',
+          overflow: 'hidden',
+          transition: '0.2s',
+          transform: hovered ? 'translateY(-2px)' : undefined,
+          boxShadow: hovered ? '0 8px 20px rgba(0,0,0,0.08)' : undefined,
+        }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <Link
+          href={href}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '14px 12px 14px 16px',
+            textDecoration: 'none',
+            minWidth: 0,
+          }}
+        >
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+            {emoji}
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e', marginBottom: 2 }}>{label}</div>
+            <div style={{ fontSize: 11, color: '#94a3b8' }}>{desc}</div>
+          </div>
+          <span style={{ color: '#cbd5e1', fontSize: 14, flexShrink: 0 }}>›</span>
+        </Link>
+        <button
+          type="button"
+          className="schedule-info-btn"
+          aria-label={infoTitle}
+          title={infoTitle}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setInfoOpen(true)
+          }}
+          style={{
+            border: 0,
+            borderLeft: '1px solid rgba(0,0,0,0.06)',
+            background: 'rgba(99,102,241,0.06)',
+            padding: '0 12px',
+            cursor: 'pointer',
+            color: '#6366f1',
+            fontSize: 18,
+            lineHeight: 1,
+            flexShrink: 0,
+          }}
+        >
+          <i className="bi bi-info-circle" aria-hidden />
+        </button>
+      </div>
+      {infoOpen && (
+        <div
+          role="dialog"
+          aria-modal
+          aria-labelledby="schedule-info-title"
+          onClick={() => setInfoOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            zIndex: 1080,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(420px, 100%)',
+              background: '#fff',
+              borderRadius: 16,
+              padding: '18px 18px 16px',
+              boxShadow: '0 20px 50px rgba(15,23,42,0.2)',
+            }}
+          >
+            <h6 id="schedule-info-title" style={{ fontSize: 15, fontWeight: 700, marginBottom: 10, color: '#0f172a' }}>
+              {infoTitle}
+            </h6>
+            <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.55, marginBottom: 16 }}>{infoBody}</p>
+            <button type="button" className="btn btn-primary btn-sm w-100" onClick={() => setInfoOpen(false)}>
+              Mengerti
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function TaskItem({
   title,
   subject,

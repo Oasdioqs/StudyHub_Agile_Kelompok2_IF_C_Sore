@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
 
       <div className="card forgot-card p-4 p-md-5">
 
-        {/* HEADER */}
+        
         <div className="text-center mb-4">
           <div className="icon-box mb-3">
             <i className="bi bi-envelope"></i>
@@ -62,21 +62,21 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        {/* ERROR */}
+        
         {error && (
           <div className="alert alert-danger py-2 small text-center">
             {error}
           </div>
         )}
 
-        {/* SUCCESS */}
+        
         {success && (
           <div className="alert alert-success py-2 small text-center">
             {success}
           </div>
         )}
 
-        {/* FORM */}
+        
         {!success && (
           <form onSubmit={handleSubmit}>
 
@@ -100,7 +100,7 @@ export default function ForgotPasswordPage() {
           </form>
         )}
 
-        {/* BACK */}
+        
         <div className="text-center mt-3">
           <Link href="/auth/login" className="link-primary small">
             ← Kembali ke Login
@@ -109,7 +109,7 @@ export default function ForgotPasswordPage() {
 
       </div>
 
-      {/* STYLE */}
+      
       <style jsx>{`
         .forgot-wrapper {
           min-height: 100vh;
@@ -160,7 +160,7 @@ export default function ForgotPasswordPage() {
           transform: scale(1.02);
         }
 
-        /* 🔥 BUTTON STYLE SAMA LOGIN */
+        
         .btn-modern {
           display: block;
           padding: 12px;

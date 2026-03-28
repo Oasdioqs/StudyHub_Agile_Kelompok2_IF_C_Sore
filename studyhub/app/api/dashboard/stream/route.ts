@@ -2,6 +2,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getDashboardHistory, saveDashboardDay } from '@/lib/dashboard-days'
+import { getJakartaDayRange, getJakartaMondayFirstIndex, getJakartaNowDate } from '@/lib/jakarta-time'
+import { findTodayScheduleForDashboard } from '@/lib/weekly-schedule-db'
 
 function calculateProgress(doneToday: number, totalToday: number, penaltyPercent: number) {
   if (totalToday <= 0) return 0
@@ -10,14 +12,15 @@ function calculateProgress(doneToday: number, totalToday: number, penaltyPercent
 }
 
 async function fetchStats(userId: string) {
-  const todayStart = new Date(new Date().setHours(0, 0, 0, 0))
-  const todayEnd   = new Date(new Date().setHours(23, 59, 59, 999))
+  const { start: todayStart, end: todayEnd, now: jakartaNow } = getJakartaDayRange()
+  const todayDow = getJakartaMondayFirstIndex()
 
-  const [todayTasks, upcomingTasks, doneTodayCount, overdueTasks, upcomingDueTasks, completedLateToday, recentNotes, latestNotifs, unreadNotifs, history] =
+  const [todayTasks, upcomingTasks, doneTodayCount, overdueTasks, upcomingDueTasks, completedLateToday, recentNotes, latestNotifs, unreadNotifs, history, todaySchedule] =
     await Promise.all([
       db.task.findMany({
         where: { userId, deadline: { gte: todayStart, lte: todayEnd } },
-        select: { id: true, title: true, description: true, subject: true, deadline: true, priority: true, status: true },
+        orderBy: [{ deadline: 'asc' }, { createdAt: 'desc' }],
+        select: { id: true, title: true, description: true, subject: true, deadline: true, priority: true, status: true, createdAt: true },
       }),
       db.task.findMany({
         where: { userId, deadline: { gt: todayEnd } },
@@ -29,7 +32,7 @@ async function fetchStats(userId: string) {
         where: { userId, status: 'DONE', deadline: { gte: todayStart, lte: todayEnd } },
       }),
       db.task.count({
-        where: { userId, status: { not: 'DONE' }, deadline: { lt: new Date() } },
+        where: { userId, status: { not: 'DONE' }, deadline: { lt: jakartaNow } },
       }),
       db.task.count({
         where: { userId, status: { not: 'DONE' }, deadline: { gt: todayEnd } },
@@ -56,6 +59,7 @@ async function fetchStats(userId: string) {
       }),
       db.notification.count({ where: { userId, isRead: false } }),
       getDashboardHistory(userId),
+      findTodayScheduleForDashboard(userId, todayDow),
     ])
 
   const totalToday = todayTasks.length
@@ -67,7 +71,7 @@ async function fetchStats(userId: string) {
   const missedDeadlineCount = overdueTasks + completedLateToday
   const progressPenaltyPercent = missedDeadlineCount > 0 ? 10 : 0
   const progress   = calculateProgress(doneToday, totalToday, progressPenaltyPercent)
-  await saveDashboardDay(userId, new Date(), {
+  await saveDashboardDay(userId, getJakartaNowDate(), {
     totalTasks: totalToday,
     doneTasks: doneToday,
     pendingTasks: todayPendingTasks,
@@ -93,6 +97,7 @@ async function fetchStats(userId: string) {
     latestNotifs,
     unreadNotifs,
     history,
+    todaySchedule,
   }
 }
 

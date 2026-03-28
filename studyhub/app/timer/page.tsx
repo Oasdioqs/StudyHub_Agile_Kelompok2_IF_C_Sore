@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import Sidebar from '@/components/layout/Sidebar'
-import Topbar from '@/components/layout/Topbar'
+import TopbarShell from '@/components/layout/TopbarShell'
 
 type Mode = 'pomodoro' | 'short' | 'long'
 
@@ -98,11 +98,11 @@ export default function TimerPage() {
     <div>
       <Sidebar />
       <div className="app-main">
-        <Topbar />
+        <TopbarShell />
         <main className="p-4">
           <div className="row g-4 justify-content-center">
             <div className="col-12 col-lg-5">
-              {/* Mode selector */}
+              
               <div className="card mb-4">
                 <div className="card-body p-2">
                   <div className="btn-group w-100">
@@ -119,7 +119,7 @@ export default function TimerPage() {
                 </div>
               </div>
 
-              {/* Timer */}
+              
               <div className="card mb-4">
                 <div className="card-body py-5 text-center">
                   <div style={{ position: 'relative', width: 200, margin: '0 auto 24px' }}>
@@ -172,7 +172,7 @@ export default function TimerPage() {
                 </div>
               </div>
 
-              {/* Session count */}
+              
               <div className="card">
                 <div className="card-body py-3">
                   <div className="d-flex justify-content-between align-items-center">
@@ -190,7 +190,7 @@ export default function TimerPage() {
               </div>
             </div>
 
-            {/* History */}
+            
             <div className="col-12 col-lg-5">
               <div className="card h-100">
                 <div className="card-header bg-white border-bottom py-3">

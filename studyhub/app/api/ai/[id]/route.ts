@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+const TASK_LIST_CONTEXT_PREFIX = '[TASK_LIST_CONTEXT]'
+const TASK_PENDING_ACTION_PREFIX = '[TASK_PENDING_ACTION]'
+
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
@@ -29,7 +32,22 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Session tidak ditemukan' }, { status: 404 })
   }
 
-  return NextResponse.json(aiSession)
+  const safeMessages = Array.isArray(aiSession.messages)
+    ? aiSession.messages.filter(
+        (m: any) =>
+          !(
+            m?.role === 'assistant' &&
+            typeof m?.content === 'string' &&
+            (m.content.startsWith(TASK_LIST_CONTEXT_PREFIX) ||
+              m.content.startsWith(TASK_PENDING_ACTION_PREFIX))
+          ),
+      )
+    : []
+
+  return NextResponse.json({
+    ...aiSession,
+    messages: safeMessages,
+  })
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

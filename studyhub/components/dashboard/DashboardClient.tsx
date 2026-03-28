@@ -5,6 +5,8 @@ import axios from 'axios'
 import Link from 'next/link'
 import { LiftCard, QuickLinkCard, TaskItem, NoteCard } from './HoverCard'
 import { useDashboardStream, DashboardStats } from '@/hooks/useDashboardStream'
+import { WEEKDAY_LABELS } from '@/lib/schedule-week'
+import { getJakartaMondayFirstIndex } from '@/lib/jakarta-time'
 
 function useAnimatedNumber(target: number, duration = 700) {
   const [display, setDisplay] = useState(target)
@@ -143,7 +145,26 @@ export default function DashboardClient({
   today: string
 }) {
   const { stats, status, lastUpdatedAt } = useDashboardStream(initial)
-  const { todayTasks, upcomingTasks, doneToday, totalToday, doneOverall, totalOverall, todayPending, upcomingDue, missedDeadlineCount, progressPenaltyPercent, progress, overdueCount, recentNotes, latestNotifs, unreadNotifs, history } = stats
+  const {
+    todayTasks,
+    upcomingTasks,
+    doneToday,
+    totalToday,
+    doneOverall,
+    totalOverall,
+    todayPending,
+    upcomingDue,
+    missedDeadlineCount,
+    progressPenaltyPercent,
+    progress,
+    overdueCount,
+    recentNotes,
+    latestNotifs,
+    unreadNotifs,
+    history,
+    todaySchedule,
+  } = stats
+  const scheduleWeekdayLabel = WEEKDAY_LABELS[getJakartaMondayFirstIndex()]
   const [liveAgeSec, setLiveAgeSec] = useState(0)
   const [activeNotifId, setActiveNotifId] = useState<string | null>(null)
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
@@ -156,6 +177,8 @@ export default function DashboardClient({
   const [challengeTick, setChallengeTick] = useState(Date.now())
   const [activeChallenge, setActiveChallenge] = useState<{ startedAt: number; targetMinutes: number } | null>(null)
   const [challengeMap, setChallengeMap] = useState<Record<string, { startedAt: number; targetMinutes: number }>>({})
+  const [isDark, setIsDark] = useState(false)
+  const [scheduleInfoOpen, setScheduleInfoOpen] = useState(false)
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -189,10 +212,18 @@ export default function DashboardClient({
     setChallengeMap(map)
   }, [])
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const applyTheme = () => setIsDark(document.documentElement.getAttribute('data-theme') === 'dark')
+    applyTheme()
+    const observer = new MutationObserver(applyTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
+  }, [])
+
   const effectiveDone = doneOverall
   const effectiveTotal = totalOverall
   const statusOrder: Record<string, number> = { IN_PROGRESS: 0, TODO: 1, DONE: 2 }
-  const priorityOrder: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 }
   const mergedTodayTasks = todayTasks.map((t) => ({
     ...t,
     status: (statusOverrides[t.id] as typeof t.status) ?? t.status,
@@ -200,10 +231,15 @@ export default function DashboardClient({
   const sortedTodayTasks = [...mergedTodayTasks].sort((a, b) => {
     const byStatus = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
     if (byStatus !== 0) return byStatus
-    return (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9)
+    const ad = a.deadline ? new Date(a.deadline as string).getTime() : Number.POSITIVE_INFINITY
+    const bd = b.deadline ? new Date(b.deadline as string).getTime() : Number.POSITIVE_INFINITY
+    if (ad !== bd) return ad - bd
+    const ac = a.createdAt ? new Date(a.createdAt as string).getTime() : 0
+    const bc = b.createdAt ? new Date(b.createdAt as string).getTime() : 0
+    return bc - ac
   })
   const heroMessage =
-    progress === 100 ? 'Mantap, semua beres! 🎉' :
+    progress === 100 ? 'Mantap semua beres! 🎉' :
     progress >= 50   ? 'Hampir sampai!' :
     'Yuk semangat!'
   const notificationTone = (type: string) => {
@@ -301,12 +337,14 @@ export default function DashboardClient({
         margin: '0 auto',
         padding: '24px 16px 48px',
         background:
-          'radial-gradient(circle at top right, rgba(99,102,241,0.12), transparent 42%), radial-gradient(circle at 15% 85%, rgba(16,185,129,0.09), transparent 45%), linear-gradient(180deg, #fbfcff 0%, #f8fafc 100%)',
+          isDark
+            ? 'radial-gradient(circle at top right, rgba(99,102,241,0.18), transparent 44%), radial-gradient(circle at 15% 85%, rgba(16,185,129,0.14), transparent 48%), linear-gradient(180deg, #0f172a 0%, #0b1220 100%)'
+            : 'radial-gradient(circle at top right, rgba(99,102,241,0.12), transparent 42%), radial-gradient(circle at 15% 85%, rgba(16,185,129,0.09), transparent 45%), linear-gradient(180deg, #fbfcff 0%, #f8fafc 100%)',
         borderRadius: 22,
       }}
     >
 
-      {/* ─── HERO ─────────────────────────────────────────── */}
+      
       <div style={{ background: '#1a1a2e', borderRadius: 20, padding: '28px 28px 24px', position: 'relative', overflow: 'hidden', marginBottom: 20, color: '#fff' }}>
         <div style={{ position: 'absolute', width: 220, height: 220, borderRadius: '50%', background: 'radial-gradient(circle,rgba(108,99,255,0.35),transparent)', top: -80, right: -40, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', width: 150, height: 150, borderRadius: '50%', background: 'radial-gradient(circle,rgba(245,158,11,0.2),transparent)', bottom: -60, right: 60, pointerEvents: 'none' }} />
@@ -323,7 +361,7 @@ export default function DashboardClient({
             Halo, {firstName}! 👋
           </h2>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 20 }}>
-            {effectiveDone}/{effectiveTotal} total tugas selesai. {heroMessage}
+            {effectiveDone}/{effectiveTotal} total tugas selesai. <span style={{ whiteSpace: 'nowrap' }}>{heroMessage}</span>
           </p>
           {progressPenaltyPercent > 0 && (
             <p style={{ fontSize: 12, color: 'rgba(252,165,165,0.95)', marginTop: -10, marginBottom: 16 }}>
@@ -353,7 +391,7 @@ export default function DashboardClient({
         </div>
       </div>
 
-      {/* ─── STATS ────────────────────────────────────────── */}
+      
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 10, marginBottom: 16 }}>
         <StatCard label="Tugas Hari Ini"  value={totalOverall}                            emoji="📋" bg="#ede9fe" color="#6c63ff" tone="violet" />
         <StatCard label="Tugas Belum Siap" value={Math.max(0, totalOverall - doneOverall)} emoji="📌" bg="#e0f2fe" color="#0ea5e9" tone="blue" />
@@ -363,9 +401,9 @@ export default function DashboardClient({
         <StatCard label="Notifikasi Baru" value={visibleUnreadNotifs}                     emoji="🔔" bg="#fef9c3" color="#d97706" tone="amber" />
       </div>
 
-      {/* ─── DEADLINE RADAR + NOTIFICATIONS ───────────────── */}
+      
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 14 }}>
-        <div style={{ background: 'linear-gradient(160deg, #fff, #fff7f7)', borderRadius: 16, border: '1px solid #fee2e2', padding: 16, boxShadow: '0 12px 24px rgba(220,38,38,0.06)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ background: isDark ? 'linear-gradient(160deg, #111827, #1f172a)' : 'linear-gradient(160deg, #fff, #fff7f7)', borderRadius: 16, border: `1px solid ${isDark ? '#3f1f2b' : '#fee2e2'}`, padding: 16, boxShadow: isDark ? '0 12px 24px rgba(2,6,23,0.35)' : '0 12px 24px rgba(220,38,38,0.06)', position: 'relative', overflow: 'hidden' }}>
           <div
             style={{
               position: 'absolute',
@@ -388,15 +426,15 @@ export default function DashboardClient({
             </Link>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '10px 12px', boxShadow: overdueCount > 0 ? '0 0 0 2px rgba(239,68,68,0.18)' : 'none', animation: overdueCount > 0 ? 'overduePulse 1.8s ease-in-out infinite' : 'none' }}>
+            <div style={{ background: isDark ? '#2b1620' : '#fef2f2', border: `1px solid ${isDark ? '#7f1d1d' : '#fecaca'}`, borderRadius: 12, padding: '10px 12px', boxShadow: overdueCount > 0 ? '0 0 0 2px rgba(239,68,68,0.18)' : 'none', animation: overdueCount > 0 ? 'overduePulse 1.8s ease-in-out infinite' : 'none' }}>
               <div style={{ fontSize: 10, color: '#b91c1c' }}>Overdue</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#dc2626' }}>{overdueCount}</div>
             </div>
-            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 12, padding: '10px 12px' }}>
+            <div style={{ background: isDark ? '#2b1c12' : '#fff7ed', border: `1px solid ${isDark ? '#9a3412' : '#fed7aa'}`, borderRadius: 12, padding: '10px 12px' }}>
               <div style={{ fontSize: 10, color: '#9a3412' }}>Hari Ini</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#ea580c' }}>{todayPending}</div>
             </div>
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px' }}>
+            <div style={{ background: isDark ? '#10271a' : '#f0fdf4', border: `1px solid ${isDark ? '#166534' : '#bbf7d0'}`, borderRadius: 12, padding: '10px 12px' }}>
               <div style={{ fontSize: 10, color: '#166534'} }>Mendatang</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#16a34a' }}>{upcomingDue}</div>
             </div>
@@ -407,7 +445,7 @@ export default function DashboardClient({
           <style>{`@keyframes overduePulse{0%,100%{transform:translateY(0);box-shadow:0 0 0 2px rgba(239,68,68,0.18)}50%{transform:translateY(-1px);box-shadow:0 0 0 4px rgba(239,68,68,0.14)}}@keyframes radarGlow{0%,100%{opacity:.75;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}`}</style>
         </div>
 
-        <div style={{ background: 'linear-gradient(180deg, #ffffff, #f8faff)', borderRadius: 16, border: '1px solid #dbeafe', overflow: 'hidden', boxShadow: '0 12px 24px rgba(59,130,246,0.07)', position: 'relative' }}>
+        <div style={{ background: isDark ? 'linear-gradient(180deg, #111827, #0f172a)' : 'linear-gradient(180deg, #ffffff, #f8faff)', borderRadius: 16, border: `1px solid ${isDark ? '#1f2937' : '#dbeafe'}`, overflow: 'hidden', boxShadow: isDark ? '0 12px 24px rgba(2,6,23,0.35)' : '0 12px 24px rgba(59,130,246,0.07)', position: 'relative' }}>
           <div style={{ position: 'absolute', top: -64, right: -20, width: 140, height: 140, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,70,229,0.12), transparent 65%)', pointerEvents: 'none' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '0.5px solid rgba(0,0,0,0.06)', background: 'rgba(79,70,229,0.04)' }}>
             <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600 }}>
@@ -500,11 +538,11 @@ export default function DashboardClient({
         </div>
       )}
 
-      {/* ─── TASKS + NOTES ────────────────────────────────── */}
+      
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 14 }}>
 
-        {/* TASKS */}
-        <div style={{ background: 'linear-gradient(180deg, #ffffff, #faf7ff)', borderRadius: 16, border: '1px solid #ddd6fe', overflow: 'hidden', boxShadow: '0 12px 24px rgba(124,58,237,0.06)' }}>
+        
+        <div style={{ background: isDark ? 'linear-gradient(180deg, #111827, #18122b)' : 'linear-gradient(180deg, #ffffff, #faf7ff)', borderRadius: 16, border: `1px solid ${isDark ? '#312e81' : '#ddd6fe'}`, overflow: 'hidden', boxShadow: isDark ? '0 12px 24px rgba(2,6,23,0.35)' : '0 12px 24px rgba(124,58,237,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600 }}>
               <span style={{ width: 26, height: 26, borderRadius: 8, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✅</span>
@@ -549,8 +587,72 @@ export default function DashboardClient({
           )}
         </div>
 
-        {/* NOTES */}
-        <div style={{ background: 'linear-gradient(180deg, #ffffff, #f3fff8)', borderRadius: 16, border: '1px solid #bbf7d0', overflow: 'hidden', boxShadow: '0 12px 24px rgba(22,163,74,0.06)' }}>
+        <div style={{ background: isDark ? 'linear-gradient(180deg, #111827, #0c1a24)' : 'linear-gradient(180deg, #ffffff, #f0fdfa)', borderRadius: 16, border: `1px solid ${isDark ? '#115e59' : '#99f6e4'}`, overflow: 'hidden', boxShadow: isDark ? '0 12px 24px rgba(2,6,23,0.35)' : '0 12px 24px rgba(13,148,136,0.08)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, flexWrap: 'wrap' }}>
+              <span style={{ width: 26, height: 26, borderRadius: 8, background: '#ccfbf1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>📅</span>
+              <span>Jadwal Hari Ini</span>
+              <button
+                type="button"
+                onClick={() => setScheduleInfoOpen(true)}
+                aria-label="Info jadwal kuliah"
+                title="Info"
+                style={{
+                  border: 0,
+                  background: 'rgba(13,148,136,0.12)',
+                  color: '#0f766e',
+                  width: 22,
+                  height: 22,
+                  borderRadius: 999,
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  lineHeight: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <i className="bi bi-info-circle" aria-hidden />
+              </button>
+            </div>
+            <Link href="/calendar" style={{ fontSize: 11, color: '#0d9488', textDecoration: 'none', padding: '4px 10px', border: '0.5px solid #99f6e4', borderRadius: 8 }}>
+              Kalender
+            </Link>
+          </div>
+          <div style={{ padding: '0 16px 10px', fontSize: 10, color: '#64748b', lineHeight: 1.35 }}>
+            Kuliah & sekolah · hari {scheduleWeekdayLabel} (WIB)
+          </div>
+          {todaySchedule.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 16px', gap: 8 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#ccfbf1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📅</div>
+              <p style={{ fontSize: 13, color: '#64748b', margin: 0, textAlign: 'center' }}>Belum ada jadwal untuk hari ini</p>
+              <Link href="/calendar" style={{ fontSize: 11, color: '#0d9488', fontWeight: 600 }}>
+                Atur di Kalender →
+              </Link>
+            </div>
+          ) : (
+            <ul style={{ padding: 0, margin: 0, height: 136, overflowY: 'auto', scrollbarGutter: 'stable' }}>
+              {todaySchedule.map((s) => {
+                const timePart = [s.startTime, s.endTime].filter(Boolean).join(' – ')
+                const sub = [timePart, s.place].filter(Boolean).join(' · ')
+                return (
+                  <TaskItem
+                    key={s.id}
+                    title={s.title}
+                    subject={sub || undefined}
+                    dot="#0d9488"
+                    badgeBg="#ccfbf1"
+                    badgeText="#0f766e"
+                    badgeLabel="Jadwal"
+                  />
+                )
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div style={{ background: isDark ? 'linear-gradient(180deg, #111827, #10271a)' : 'linear-gradient(180deg, #ffffff, #f3fff8)', borderRadius: 16, border: `1px solid ${isDark ? '#166534' : '#bbf7d0'}`, overflow: 'hidden', boxShadow: isDark ? '0 12px 24px rgba(2,6,23,0.35)' : '0 12px 24px rgba(22,163,74,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600 }}>
               <span style={{ width: 26, height: 26, borderRadius: 8, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>📒</span>
@@ -600,9 +702,9 @@ export default function DashboardClient({
             onClick={(e) => e.stopPropagation()}
             style={{
               width: 'min(520px, 100%)',
-              background: '#fff',
+              background: 'var(--sh-card-bg)',
               borderRadius: 16,
-              border: '1px solid #e2e8f0',
+              border: '1px solid var(--sh-border)',
               boxShadow: '0 18px 44px rgba(15,23,42,0.2)',
               overflow: 'hidden',
             }}
@@ -837,9 +939,9 @@ export default function DashboardClient({
             onClick={(e) => e.stopPropagation()}
             style={{
               width: 'min(620px, 100%)',
-              background: '#fff',
+              background: 'var(--sh-card-bg)',
               borderRadius: 16,
-              border: '1px solid #e2e8f0',
+              border: '1px solid var(--sh-border)',
               boxShadow: '0 18px 44px rgba(15,23,42,0.2)',
               overflow: 'hidden',
             }}
@@ -887,7 +989,44 @@ export default function DashboardClient({
         </div>
       )}
 
-      {/* ─── QUICK LINKS ──────────────────────────────────── */}
+      
+      {scheduleInfoOpen && (
+        <div
+          role="dialog"
+          aria-modal
+          onClick={() => setScheduleInfoOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(420px, 100%)',
+              background: '#fff',
+              borderRadius: 16,
+              padding: '18px 18px 16px',
+              boxShadow: '0 20px 50px rgba(15,23,42,0.2)',
+            }}
+          >
+            <h6 style={{ fontSize: 15, fontWeight: 700, marginBottom: 10, color: '#0f172a' }}>Tentang Jadwal Hari Ini</h6>
+            <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.55, marginBottom: 16 }}>
+              Kotak ini menampilkan jadwal sekolah atau kuliah untuk hari ini menurut zona WIB (Senin–Minggu), bisa lebih dari satu mapel per hari. Ubah atau tambah jadwal di halaman Kalender lewat tombol Tambah jadwal.
+            </p>
+            <button type="button" className="btn btn-primary btn-sm w-100" onClick={() => setScheduleInfoOpen(false)}>
+              Mengerti
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
         {([
           { href: '/forum',    emoji: '💬', label: 'Forum Diskusi',  desc: 'Tanya & jawab bersama', iconBg: '#fef9c3' },

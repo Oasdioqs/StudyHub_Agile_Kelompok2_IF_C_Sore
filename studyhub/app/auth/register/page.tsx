@@ -34,7 +34,6 @@ export default function RegisterPage() {
     })
   }, [rive])
 
-
   const setVal = (input: any, val: any) => {
     if (input) input.value = val
   }
@@ -99,15 +98,15 @@ export default function RegisterPage() {
   return (
     <div className="register-wrapper">
 
-      {/* 🐻 BEAR */}
+      
       <div className="bear-wrapper">
         <RiveComponent className="bear-canvas" />
       </div>
 
-      {/* CARD */}
+      
       <div className="card register-card p-4 p-md-5">
 
-        {/* HEADER */}
+        
         <div className="text-center mb-4">
           <h4 className="fw-bold mb-1">Buat Akun Baru</h4>
           <p className="text-muted small">
@@ -131,7 +130,7 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit}>
 
-          {/* NAMA */}
+          
           <div className="mb-3">
             <label className="form-label small fw-semibold">Nama Lengkap</label>
             <input
@@ -149,7 +148,7 @@ export default function RegisterPage() {
             />
           </div>
 
-          {/* EMAIL */}
+          
           <div className="mb-3">
             <label className="form-label small fw-semibold">Email</label>
             <input
@@ -167,7 +166,7 @@ export default function RegisterPage() {
             />
           </div>
 
-          {/* PASSWORD */}
+          
           <div className="mb-3 position-relative">
             <label className="form-label small fw-semibold">Password</label>
             <input
@@ -191,7 +190,7 @@ export default function RegisterPage() {
             </span>
           </div>
 
-          {/* CONFIRM */}
+          
           <div className="mb-3 position-relative">
             <label className="form-label small fw-semibold">Konfirmasi Password</label>
             <input
@@ -213,7 +212,7 @@ export default function RegisterPage() {
             </span>
           </div>
 
-          {/* CHECKBOX */}
+          
           <div className="form-check mb-3">
             <input
               className="form-check-input"
@@ -228,7 +227,7 @@ export default function RegisterPage() {
             </label>
           </div>
 
-          {/* BUTTON */}
+          
           <button
             type="submit"
             onClick={() => {
@@ -251,7 +250,7 @@ export default function RegisterPage() {
           <hr />
         </div>
 
-        {/* GOOGLE */}
+        
         <button
           type="button"
           onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
@@ -269,7 +268,7 @@ export default function RegisterPage() {
 
       </div>
 
-      {/* STYLE */}
+      
       <style jsx>{`
         .register-wrapper {
           min-height: 100vh;
@@ -288,7 +287,7 @@ export default function RegisterPage() {
           100% { background-position: 0% 50%; }
         }
 
-        /* 🐻 */
+        
         .bear-wrapper {
           width: 240px;
           height: 200px;
@@ -368,7 +367,7 @@ export default function RegisterPage() {
           opacity: 1;
         }
 
-        /* DIVIDER */
+        
         .divider {
           display: flex;
           align-items: center;
@@ -390,14 +389,14 @@ export default function RegisterPage() {
           background: rgba(255,255,255,0.9);
           backdrop-filter: blur(6px);
           transition: all 0.2s ease;
-          color: #111; /* 🔥 ini kunci */
+          color: #111; 
           border: 1px solid #e5e7eb;
         }
 
         .btn-google:hover {
           transform: translateY(-2px);
           box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-          color: #111; /* biar ga ilang */
+          color: #111; 
         }
 
         .btn-google * {

@@ -1,7 +1,7 @@
 import Sidebar from '@/components/layout/Sidebar'
 import TopbarShell from '@/components/layout/TopbarShell'
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function CalendarLayout({ children }: { children: React.ReactNode }) {
   return (
     <div>
       <Sidebar />

@@ -36,9 +36,27 @@ model User {
   threads          Thread[]
   timerSessions    TimerSession[]
   loginOtps        LoginOtp[]
-  dashboardDays    DashboardDay[]
+  dashboardDays       DashboardDay[]
+  weeklyScheduleSlots WeeklyScheduleSlot[]
 
   @@map("users")
+}
+
+model WeeklyScheduleSlot {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayOfWeek  Int
+  title      String
+  startTime  String?
+  endTime    String?
+  place      String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, dayOfWeek])
+  @@map("weekly_schedule_slots")
 }
 
 model DashboardDay {

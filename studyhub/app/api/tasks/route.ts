@@ -25,7 +25,10 @@ export async function GET(req: NextRequest) {
         ],
       }),
     },
-    orderBy: [{ priority: 'asc' }, { deadline: 'asc' }, { createdAt: 'desc' }],
+    orderBy: [
+      { deadline: { sort: 'asc', nulls: 'last' } },
+      { createdAt: 'desc' },
+    ],
   })
 
   return NextResponse.json(tasks)

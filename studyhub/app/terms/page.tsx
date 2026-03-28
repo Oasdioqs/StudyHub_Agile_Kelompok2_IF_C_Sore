@@ -6,14 +6,14 @@ export default function TermsPage() {
   return (
     <div className="terms-wrapper">
 
-      {/* HEADER */}
+      
       
       <div className="hero">
         <h1>Syarat & Ketentuan</h1>
         <p>Baca dulu ya sebelum lanjut — biar sama-sama enak 😏</p>
       </div>
 
-      {/* CARD */}
+      
       <div className="card terms-card p-4 p-md-5">
 
         <p className="date">Terakhir diperbarui: 26 Maret 2026</p>
@@ -66,7 +66,7 @@ export default function TermsPage() {
 
         </div>
 
-        {/* BUTTON */}
+        
         <div className="mt-4">
           <Link href="/auth/register" className="btn-modern w-100 fw-semibold text-center d-block">
             Saya Mengerti
@@ -75,7 +75,7 @@ export default function TermsPage() {
 
       </div>
 
-      {/* STYLE */}
+      
       <style jsx>{`
         .terms-wrapper {
           min-height: 100vh;
@@ -94,7 +94,7 @@ export default function TermsPage() {
           100% { background-position: 0% 50%; }
         }
 
-        /* 🔥 HERO */
+        
         .hero {
           text-align: center;
           margin-bottom: 25px;
@@ -114,7 +114,7 @@ export default function TermsPage() {
           color: #666;
         }
 
-        /* 💎 CARD */
+        
         .terms-card {
           max-width: 760px;
           width: 100%;
@@ -135,7 +135,7 @@ export default function TermsPage() {
           margin-bottom: 20px;
         }
 
-        /* ✨ SECTION */
+        
         .terms-content section {
           margin-bottom: 18px;
           padding: 16px;

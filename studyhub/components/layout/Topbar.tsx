@@ -6,6 +6,7 @@ import Link from 'next/link'
 const titles: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/tasks': 'Manajemen Tugas',
+  '/calendar': 'Kalender Belajar',
   '/notes': 'Catatan Digital',
   '/forum': 'Forum Diskusi',
   '/ai-tutor': 'Chat dengan AI',
@@ -16,6 +17,7 @@ const titles: Record<string, string> = {
 const menuItems = [
   { href: '/dashboard', label: 'Dashboard', desc: 'Ringkasan progres belajar harian' },
   { href: '/tasks', label: 'Tugas', desc: 'Kelola daftar tugas dan deadline' },
+  { href: '/calendar', label: 'Kalender', desc: 'Lihat jadwal tugas per tanggal' },
   { href: '/notes', label: 'Catatan', desc: 'Lihat dan kelola catatan belajar' },
   { href: '/forum', label: 'Forum', desc: 'Diskusi dan tanya jawab komunitas' },
   { href: '/ai-tutor', label: 'AI Tutor', desc: 'Tanya soal dan belajar bareng AI' },
@@ -35,18 +37,14 @@ export default function Topbar() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const isTasksPage = pathname === '/tasks'
+  const isCalendarPage = pathname === '/calendar'
   const title = titles[pathname] ?? 'StudyHub'
   const q = searchParams.get('q') ?? ''
   const status = searchParams.get('status') ?? ''
   const priority = searchParams.get('priority') ?? ''
   const [keyword, setKeyword] = useState(q)
   const [showMenuSearch, setShowMenuSearch] = useState(false)
-  const now = new Date().toLocaleDateString('id-ID', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-  })
-
+  const [isDark, setIsDark] = useState(false)
   const updateTaskFilter = (key: 'status' | 'priority', value: string) => {
     const params = new URLSearchParams(searchParams.toString())
     if (value) params.set(key, value)
@@ -73,9 +71,15 @@ export default function Topbar() {
   const aiFallbackSuggestion =
     !isTasksPage && searchLower && menuSuggestions.length === 0
       ? {
-          href: `/ai-tutor?ask=${encodeURIComponent(keyword.trim())}`,
+          href: `/ai-tutor?ask=${encodeURIComponent(
+            isCalendarPage
+              ? `Bantu rangkumin kalender dan jadwal saya untuk konteks ini: ${keyword.trim()}`
+              : keyword.trim(),
+          )}`,
           label: 'Chat dengan AI',
-          desc: `Tanya langsung: "${keyword.trim()}"`,
+          desc: isCalendarPage
+            ? `Analisis kalender: "${keyword.trim()}"`
+            : `Tanya langsung: "${keyword.trim()}"`,
         }
       : null
 
@@ -97,6 +101,24 @@ export default function Topbar() {
     return () => clearTimeout(timer)
   }, [isTasksPage, keyword, q, router, searchParams])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const savedTheme = window.localStorage.getItem('studyhub-theme')
+    const preferDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
+    const dark = savedTheme ? savedTheme === 'dark' : Boolean(preferDark)
+    setIsDark(dark)
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+  }, [])
+
+  const toggleTheme = () => {
+    const next = !isDark
+    setIsDark(next)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('studyhub-theme', next ? 'dark' : 'light')
+    }
+    document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light')
+  }
+
   return (
     <header className="topbar-modern sticky-top">
       <div className="topbar-left">
@@ -110,7 +132,13 @@ export default function Topbar() {
             <i className="bi bi-search topbar-search-icon"></i>
             <input
               className="topbar-search-input"
-              placeholder={isTasksPage ? 'Cari judul tugas...' : 'Cari nama menu...'}
+              placeholder={
+                isTasksPage
+                  ? 'Cari judul tugas...'
+                  : isCalendarPage
+                    ? 'Contoh: rangkumin bulan ini...'
+                    : 'Cari nama menu...'
+              }
               aria-label="Cari"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
@@ -182,7 +210,23 @@ export default function Topbar() {
       </div>
 
       <div className="topbar-right">
-        <span className="topbar-date">{now}</span>
+        <Link
+          href="/calendar"
+          className="btn btn-sm topbar-icon-btn"
+          title="Buka kalender"
+          aria-label="Buka kalender"
+        >
+          <i className="bi bi-calendar3" style={{ fontSize: 16 }}></i>
+        </Link>
+        <button
+          type="button"
+          className="btn btn-sm topbar-icon-btn"
+          title={isDark ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
+          aria-label={isDark ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
+          onClick={toggleTheme}
+        >
+          <i className={`bi ${isDark ? 'bi-sun' : 'bi-moon-stars'}`} style={{ fontSize: 16 }}></i>
+        </button>
         <Link
           href="/tasks?action=new"
           className="btn btn-sm topbar-action-btn"

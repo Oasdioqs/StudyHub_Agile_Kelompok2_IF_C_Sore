@@ -100,15 +100,15 @@ export default function LoginPage() {
   return (
     <div className="login-wrapper">
       
-      {/* 🐻 BERUANG */}
+      
       <div className="bear-wrapper">
         <RiveComponent className="bear-canvas" />
       </div>
 
-      {/* CARD */}
+      
       <div className="card login-card p-4 p-md-5">
         
-        {/* HEADER */}
+        
         <div className="text-center mb-4">
           <i className="bi bi-book-half icon-main"></i>
           <h4 className="fw-bold mb-1">Masuk ke StudyHub</h4>
@@ -120,13 +120,12 @@ export default function LoginPage() {
           </p>
         </div>
 
-
         {error && <div className="alert alert-danger py-2 small">{error}</div>}
         {success && <div className="alert alert-success py-2 small">{success}</div>}
 
-        {/* FORM */}
+        
         <form onSubmit={handleSubmit}>
-          {/* EMAIL */}
+          
           <div className="mb-3">
             <label className="form-label small fw-semibold">Email</label>
             <input
@@ -144,7 +143,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* PASSWORD */}
+          
           <div className="mb-3">
             <div className="d-flex justify-content-between">
               <label className="form-label small fw-semibold">Password</label>
@@ -177,7 +176,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* BUTTON */}
+          
           <button
             className={`btn btn-modern w-100 fw-semibold ${!isLoginValid ? 'btn-disabled' : ''}`}
             disabled={!isLoginValid || loading || !!success}
@@ -192,7 +191,7 @@ export default function LoginPage() {
           <hr />
         </div>
 
-        {/* GOOGLE */}
+        
         <button
           type="button"
           onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
@@ -210,7 +209,7 @@ export default function LoginPage() {
 
       </div>
 
-      {/* STYLE */}
+      
       <style jsx>{`
         .login-wrapper {
           min-height: 100vh;
@@ -243,7 +242,7 @@ export default function LoginPage() {
           z-index: 0;
         }
 
-        /* 🐻 */
+        
         .bear-wrapper {
           width: 240px;
           height: 200px;
@@ -257,7 +256,7 @@ export default function LoginPage() {
           height: 100%;
         }
 
-        /* CARD */
+        
         .login-card {
           max-width: 440px;
           width: 100%;
@@ -279,7 +278,7 @@ export default function LoginPage() {
           color: #6366f1;
         }
 
-        /* INPUT */
+        
         .input-modern {
           border-radius: 12px;
           transition: all 0.25s ease;
@@ -335,7 +334,7 @@ export default function LoginPage() {
           height: 1px;
         }
 
-        /* BUTTON */
+        
         .btn-modern {
           border-radius: 12px;
           background: linear-gradient(135deg, #6366f1, #8b5cf6);
@@ -380,22 +379,22 @@ export default function LoginPage() {
           transform: none !important;
         }
 
-        /* GOOGLE */
+        
         .btn-google {
           border-radius: 12px;
           background: rgba(255,255,255,0.9);
           backdrop-filter: blur(6px);
           transition: all 0.2s ease;
-          color: #111; /* 🔥 fix utama */
+          color: #111; 
         }
 
         .btn-google:hover {
           transform: translateY(-2px);
           box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-          color: #111; /* biar ga ilang */
+          color: #111; 
         }
 
-        /* DIVIDER */
+        
         .divider {
           display: flex;
           align-items: center;
@@ -412,7 +411,7 @@ export default function LoginPage() {
           flex: 1;
         }
 
-        /* EYE ICON */
+        
         .eye-icon {
           position: absolute;
           right: 12px;
@@ -427,7 +426,7 @@ export default function LoginPage() {
           opacity: 1;
         }
 
-        /* LINK */
+        
         .link-primary {
           color: #6366f1;
           text-decoration: none;

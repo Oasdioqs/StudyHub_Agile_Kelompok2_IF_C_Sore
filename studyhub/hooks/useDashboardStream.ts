@@ -11,6 +11,7 @@ export interface DashboardStats {
     deadline?: string | Date | null
     priority: 'HIGH' | 'MEDIUM' | 'LOW'
     status: string
+    createdAt?: string | Date
   }[]
   upcomingTasks: {
     id: string
@@ -41,6 +42,14 @@ export interface DashboardStats {
     pendingTasks: number
     overdueTasks: number
     progress: number
+  }[]
+  todaySchedule: {
+    id: string
+    dayOfWeek: number
+    title: string
+    startTime: string | null
+    endTime: string | null
+    place: string | null
   }[]
 }
 
@@ -73,7 +82,7 @@ export function useDashboardStream(initial: DashboardStats) {
         setStats(data)
         setStatus('live')
         setLastUpdatedAt(Date.now())
-      } catch { /* ignore parse errors */ }
+      } catch {  }
     }
 
     es.onerror = () => {

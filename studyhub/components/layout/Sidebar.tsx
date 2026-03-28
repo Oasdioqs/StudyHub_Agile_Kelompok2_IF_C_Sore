@@ -8,6 +8,7 @@ import { useState } from 'react'
 const navItems = [
   { href: '/dashboard',  icon: 'bi-house-door',       label: 'Dashboard' },
   { href: '/tasks',      icon: 'bi-check2-square',    label: 'Tugas' },
+  { href: '/calendar',   icon: 'bi-calendar3',        label: 'Kalender' },
   { href: '/notes',      icon: 'bi-journal-text',     label: 'Catatan' },
   { href: '/forum',      icon: 'bi-chat-dots',        label: 'Forum Diskusi' },
   { href: '/ai-tutor',   icon: 'bi-robot',            label: 'StudyHub AI' },
@@ -36,16 +37,16 @@ export default function Sidebar() {
 
   return (
     <aside className="app-sidebar d-flex flex-column p-3">
-      {/* Logo */}
+      
       <div className="d-flex align-items-center gap-2 mb-4 px-2">
         <div className="rounded-circle d-flex align-items-center justify-content-center"
           style={{ width: 36, height: 36, background: '#4f46e5' }}>
           <i className="bi bi-book-half text-white" style={{ fontSize: 16 }}></i>
         </div>
-        <span className="fw-bold fs-5 brand-text" style={{ color: '#1e293b' }}>StudyHub</span>
+        <span className="fw-bold fs-5 brand-text">StudyHub</span>
       </div>
 
-      {/* Nav */}
+      
       <nav className="sidebar-nav flex-grow-1">
         {navItems.map((item) => (
           <Link
@@ -59,7 +60,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* User section */}
+      
       {session?.user && (
         <div className="border-top pt-3 mt-2">
           <div className="d-flex align-items-center gap-2 px-2 mb-2">

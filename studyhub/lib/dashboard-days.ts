@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { getJakartaDayRange } from '@/lib/jakarta-time'
 
 export type DashboardDayPayload = {
   totalTasks: number
@@ -9,7 +10,7 @@ export type DashboardDayPayload = {
 }
 
 function startOfDay(input: Date) {
-  return new Date(input.getFullYear(), input.getMonth(), input.getDate(), 0, 0, 0, 0)
+  return getJakartaDayRange(input).start
 }
 
 let hasDashboardDaysTableCache: boolean | null = null

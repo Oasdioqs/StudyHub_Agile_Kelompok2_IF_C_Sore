@@ -1,0 +1,68 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { findAllScheduleSlotsForUser, replaceAllScheduleSlots } from '@/lib/weekly-schedule-db'
+
+export async function GET() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const slots = await findAllScheduleSlotsForUser(session.user.id)
+  return NextResponse.json(slots)
+}
+
+type SlotInput = {
+  dayOfWeek: number
+  title: string
+  startTime?: string | null
+  endTime?: string | null
+  place?: string | null
+}
+
+export async function PUT(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  let body: { slots?: SlotInput[] }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Body tidak valid' }, { status: 400 })
+  }
+
+  const raw = Array.isArray(body.slots) ? body.slots : []
+  const cleaned: {
+    dayOfWeek: number
+    title: string
+    startTime: string | null
+    endTime: string | null
+    place: string | null
+  }[] = []
+  for (const s of raw) {
+    const dw = Number(s.dayOfWeek)
+    if (!Number.isInteger(dw) || dw < 0 || dw > 6) continue
+    const title = typeof s.title === 'string' ? s.title.trim() : ''
+    if (!title) continue
+    cleaned.push({
+      dayOfWeek: dw,
+      title,
+      startTime: typeof s.startTime === 'string' && s.startTime.trim() ? s.startTime.trim() : null,
+      endTime: typeof s.endTime === 'string' && s.endTime.trim() ? s.endTime.trim() : null,
+      place: typeof s.place === 'string' && s.place.trim() ? s.place.trim() : null,
+    })
+  }
+
+  const userId = session.user.id
+  const slots = await replaceAllScheduleSlots(userId, cleaned)
+  if (slots === null) {
+    return NextResponse.json(
+      {
+        error:
+          'Tabel jadwal belum tersedia. Hentikan npm run dev, lalu jalankan: npx prisma db push && npx prisma generate',
+      },
+      { status: 503 },
+    )
+  }
+
+  return NextResponse.json(slots)
+}
