@@ -5,7 +5,7 @@ import axios from 'axios'
 import Link from 'next/link'
 import { LiftCard, QuickLinkCard, TaskItem, NoteCard } from './HoverCard'
 import { useDashboardStream, DashboardStats } from '@/hooks/useDashboardStream'
-import { formatDurationMinutes } from '@/lib/activity-metrics'
+import { formatRemainingBeforeDeadline, formatSlotDurationLabel } from '@/lib/activity-metrics'
 import { WEEKDAY_LABELS } from '@/lib/schedule-week'
 import { getJakartaMondayFirstIndex } from '@/lib/jakarta-time'
 
@@ -180,7 +180,6 @@ export default function DashboardClient({
     unreadNotifs,
     history,
     todaySchedule,
-    activityMetrics,
   } = stats
   const scheduleWeekdayLabel = WEEKDAY_LABELS[getJakartaMondayFirstIndex()]
   const [liveAgeSec, setLiveAgeSec] = useState(0)
@@ -472,41 +471,6 @@ export default function DashboardClient({
           <style>{`@keyframes overduePulse{0%,100%{transform:translateY(0);box-shadow:0 0 0 2px rgba(239,68,68,0.18)}50%{transform:translateY(-1px);box-shadow:0 0 0 4px rgba(239,68,68,0.14)}}@keyframes radarGlow{0%,100%{opacity:.75;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}`}</style>
         </div>
 
-        <div style={{ background: isDark ? 'linear-gradient(180deg, #111827, #1e1b4b)' : 'linear-gradient(180deg, #ffffff, #f5f3ff)', borderRadius: 16, border: `1px solid ${isDark ? '#4338ca' : '#e0e7ff'}`, overflow: 'hidden', boxShadow: isDark ? '0 12px 24px rgba(2,6,23,0.35)' : '0 12px 24px rgba(99,102,241,0.08)', position: 'relative' }}>
-          <div style={{ position: 'absolute', top: -48, right: -16, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.15), transparent 65%)', pointerEvents: 'none' }} />
-          <div style={{ padding: '14px 16px', borderBottom: `0.5px solid ${isDark ? 'rgba(148,163,184,0.15)' : 'rgba(0,0,0,0.06)'}` }}>
-            <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, color: dm.ink }}>Aktivitas Baru</div>
-            <p style={{ margin: '6px 0 0', fontSize: 10, color: dm.muted, lineHeight: 1.45 }}>
-              Durasi jadwal & sisa waktu ke deadline (WIB). Pengingat otomatis 2 jam & 1 jam sebelum jadwal mulai atau deadline tugas — cek di notifikasi.
-            </p>
-          </div>
-          <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div style={{ background: isDark ? '#1e1b4b' : '#eef2ff', borderRadius: 10, padding: '10px 12px', border: `1px solid ${isDark ? '#4f46e5' : '#c7d2fe'}` }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: dm.muted }}>Durasi jadwal hari ini</div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: '#818cf8', marginTop: 4 }}>{formatDurationMinutes(activityMetrics?.scheduleMinutesTotal ?? 0)}</div>
-              </div>
-              <div style={{ background: isDark ? '#14532d' : '#f0fdf4', borderRadius: 10, padding: '10px 12px', border: `1px solid ${isDark ? '#166534' : '#bbf7d0'}` }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: dm.muted }}>Sisa waktu ke deadline</div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: '#4ade80', marginTop: 4 }}>{formatDurationMinutes(activityMetrics?.taskRemainingMinutesTotal ?? 0)}</div>
-                <div style={{ fontSize: 9, color: dm.muted2, marginTop: 2 }}>{activityMetrics?.pendingTaskCount ?? 0} tugas belum selesai</div>
-              </div>
-            </div>
-            {(activityMetrics?.taskRemainders?.length ?? 0) > 0 && (
-              <div style={{ fontSize: 10, color: dm.sub }}>
-                <div style={{ fontWeight: 600, marginBottom: 4, color: dm.ink }}>Tugas terdekat:</div>
-                <ul style={{ margin: 0, paddingLeft: 16, maxHeight: 64, overflow: 'auto' }}>
-                  {(activityMetrics?.taskRemainders ?? []).slice(0, 4).map((t) => (
-                    <li key={t.id} style={{ marginBottom: 3 }}>
-                      {t.title} — {formatDurationMinutes(t.remainingMinutes)} lagi
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-
         <div style={{ background: isDark ? 'linear-gradient(180deg, #111827, #0f172a)' : 'linear-gradient(180deg, #ffffff, #f8faff)', borderRadius: 16, border: `1px solid ${isDark ? '#1f2937' : '#dbeafe'}`, overflow: 'hidden', boxShadow: isDark ? '0 12px 24px rgba(2,6,23,0.35)' : '0 12px 24px rgba(59,130,246,0.07)', position: 'relative' }}>
           <div style={{ position: 'absolute', top: -64, right: -20, width: 140, height: 140, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,70,229,0.12), transparent 65%)', pointerEvents: 'none' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: `0.5px solid ${isDark ? 'rgba(148,163,184,0.15)' : 'rgba(0,0,0,0.06)'}`, background: isDark ? 'rgba(79,70,229,0.08)' : 'rgba(79,70,229,0.04)' }}>
@@ -635,11 +599,13 @@ export default function DashboardClient({
                 const rowTimer = rowChallenge
                   ? formatClock(Math.max(0, rowChallenge.targetMinutes * 60 - Math.max(0, Math.floor((challengeTick - rowChallenge.startedAt) / 1000))))
                   : ''
+                const remLine = formatRemainingBeforeDeadline(task.deadline as string | undefined, task.status)
+                const subLine = [task.subject, remLine].filter(Boolean).join(' · ')
                 return (
                   <TaskItem
                     key={task.id}
                     title={task.title}
-                    subject={task.subject}
+                    subject={subLine || undefined}
                     dot={isDone ? '#94a3b8' : pc.dot}
                     badgeBg={isDone ? '#e2e8f0' : pc.bg}
                     badgeText={isDone ? '#475569' : pc.text}
@@ -702,7 +668,8 @@ export default function DashboardClient({
             <ul style={{ padding: 0, margin: 0, height: 136, overflowY: 'auto', scrollbarGutter: 'stable' }}>
               {todaySchedule.map((s) => {
                 const timePart = [s.startTime, s.endTime].filter(Boolean).join(' – ')
-                const sub = [timePart, s.place].filter(Boolean).join(' · ')
+                const durLabel = formatSlotDurationLabel(s.startTime, s.endTime)
+                const sub = [timePart, durLabel, s.place].filter(Boolean).join(' · ')
                 return (
                   <TaskItem
                     key={s.id}

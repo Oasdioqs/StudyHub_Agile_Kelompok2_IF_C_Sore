@@ -1,6 +1,5 @@
 import { db } from '@/lib/db'
 import { getDashboardHistory, saveDashboardDay } from '@/lib/dashboard-days'
-import { computeActivityMetrics } from '@/lib/activity-metrics'
 import { getJakartaDayRange, getJakartaMondayFirstIndex, getJakartaNowDate } from '@/lib/jakarta-time'
 import { ensureRemindersForUser } from '@/lib/reminders'
 import { findTodayScheduleForDashboard } from '@/lib/weekly-schedule-db'
@@ -99,8 +98,6 @@ export async function loadDashboardStats(userId: string, options?: { skipReminde
     progress,
   })
 
-  const activityMetrics = computeActivityMetrics(todaySchedule, todayTasks, upcomingTasks, jakartaNow)
-
   return {
     todayTasks,
     upcomingTasks,
@@ -120,6 +117,5 @@ export async function loadDashboardStats(userId: string, options?: { skipReminde
     unreadNotifs,
     history,
     todaySchedule,
-    activityMetrics,
   }
 }

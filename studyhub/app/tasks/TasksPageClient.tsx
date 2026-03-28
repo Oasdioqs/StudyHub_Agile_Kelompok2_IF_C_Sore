@@ -1,5 +1,6 @@
 'use client'
 
+import { formatRemainingBeforeDeadline } from '@/lib/activity-metrics'
 import { useState, useEffect, useMemo } from 'react'
 import axios from 'axios'
 import { useSearchParams } from 'next/navigation'
@@ -344,15 +345,25 @@ export default function TasksPageClient() {
                                 {task.description}
                               </p>
                             )}
-                            {task.deadline && (
-                              <div className="text-muted mt-1" style={{ fontSize: 12 }}>
-                                <i className="bi bi-calendar2 me-1"></i>
-                                {new Date(task.deadline).toLocaleDateString('id-ID', {
-                                  day: 'numeric', month: 'short', year: 'numeric',
-                                  hour: '2-digit', minute: '2-digit'
-                                })}
+                            {task.deadline && (() => {
+                              const rem = formatRemainingBeforeDeadline(task.deadline, task.status)
+                              return (
+                              <div className="mt-1" style={{ fontSize: 12 }}>
+                                <span className="text-muted">
+                                  <i className="bi bi-calendar2 me-1"></i>
+                                  {new Date(task.deadline).toLocaleDateString('id-ID', {
+                                    day: 'numeric', month: 'short', year: 'numeric',
+                                    hour: '2-digit', minute: '2-digit'
+                                  })}
+                                </span>
+                                {rem && (
+                                  <span className="ms-2" style={{ color: 'var(--sh-text, #1e293b)', fontWeight: 600 }}>
+                                    · {rem}
+                                  </span>
+                                )}
                               </div>
-                            )}
+                              )
+                            })()}
                           </div>
                           <div className="d-flex gap-1 flex-shrink-0">
                             <select

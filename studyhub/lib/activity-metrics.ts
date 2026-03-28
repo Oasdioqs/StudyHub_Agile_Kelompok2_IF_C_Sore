@@ -1,12 +1,3 @@
-import type { TodayScheduleSlot } from '@/lib/weekly-schedule-db'
-
-type TaskLike = {
-  id: string
-  title: string
-  status: string
-  deadline: Date | string | null | undefined
-}
-
 function parseHHMM(s: string | null | undefined): { h: number; m: number } | null {
   if (!s || typeof s !== 'string') return null
   const t = s.trim()
@@ -29,14 +20,6 @@ export function slotDurationMinutes(startTime: string | null | undefined, endTim
   return d > 0 ? d : 0
 }
 
-export function sumScheduleDurationsMinutes(slots: Pick<TodayScheduleSlot, 'startTime' | 'endTime'>[]): number {
-  let total = 0
-  for (const s of slots) {
-    total += slotDurationMinutes(s.startTime, s.endTime)
-  }
-  return total
-}
-
 export function formatDurationMinutes(totalMinutes: number): string {
   if (totalMinutes <= 0) return '0 m'
   const h = Math.floor(totalMinutes / 60)
@@ -46,46 +29,23 @@ export function formatDurationMinutes(totalMinutes: number): string {
   return `${h} j ${m} m`
 }
 
-export function computeTaskRemainders(tasks: TaskLike[], now: Date) {
-  const byId = new Map<string, TaskLike>()
-  for (const t of tasks) {
-    if (!t.deadline) continue
-    if (t.status === 'DONE') continue
-    byId.set(t.id, t)
-  }
-  const taskRemainders: { id: string; title: string; remainingMinutes: number }[] = []
-  let taskRemainingMinutesTotal = 0
-  for (const t of Array.from(byId.values())) {
-    const dl = t.deadline instanceof Date ? t.deadline : new Date(t.deadline as string)
-    if (Number.isNaN(dl.getTime())) continue
-    const rem = Math.floor((dl.getTime() - now.getTime()) / 60_000)
-    if (rem <= 0) continue
-    taskRemainingMinutesTotal += rem
-    taskRemainders.push({ id: t.id, title: t.title, remainingMinutes: rem })
-  }
-  taskRemainders.sort((a, b) => a.remainingMinutes - b.remainingMinutes)
-  return {
-    taskRemainingMinutesTotal,
-    pendingTaskCount: taskRemainders.length,
-    taskRemainders: taskRemainders.slice(0, 8),
-  }
+/** Label singkat di samping jam jadwal, mis. "Durasi 1 j 30 m" */
+export function formatSlotDurationLabel(startTime: string | null | undefined, endTime: string | null | undefined): string | null {
+  const mins = slotDurationMinutes(startTime, endTime)
+  if (mins <= 0) return null
+  return `Durasi ${formatDurationMinutes(mins)}`
 }
 
-export function computeActivityMetrics(
-  todaySchedule: Pick<TodayScheduleSlot, 'startTime' | 'endTime'>[],
-  todayTasks: TaskLike[],
-  upcomingTasks: TaskLike[],
-  now: Date,
-) {
-  const scheduleMinutesTotal = sumScheduleDurationsMinutes(todaySchedule)
-  const { taskRemainingMinutesTotal, pendingTaskCount, taskRemainders } = computeTaskRemainders(
-    [...todayTasks, ...upcomingTasks],
-    now,
-  )
-  return {
-    scheduleMinutesTotal,
-    taskRemainingMinutesTotal,
-    pendingTaskCount,
-    taskRemainders,
-  }
+/** Sisa waktu sebelum deadline (tugas belum selesai). */
+export function formatRemainingBeforeDeadline(
+  deadline: string | Date | null | undefined,
+  status: string,
+  now: Date = new Date(),
+): string | null {
+  if (!deadline || status === 'DONE') return null
+  const d = deadline instanceof Date ? deadline : new Date(deadline as string)
+  if (Number.isNaN(d.getTime())) return null
+  const rem = Math.floor((d.getTime() - now.getTime()) / 60000)
+  if (rem < 0) return `Lewat ${formatDurationMinutes(Math.abs(rem))}`
+  return `Sisa ${formatDurationMinutes(rem)}`
 }

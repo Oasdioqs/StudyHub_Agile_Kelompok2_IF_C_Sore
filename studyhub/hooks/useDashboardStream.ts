@@ -21,20 +21,20 @@ export interface DashboardStats {
     priority: 'HIGH' | 'MEDIUM' | 'LOW'
     status: string
   }[]
-  doneToday:     number
-  totalToday:    number
-  doneOverall:   number
-  totalOverall:  number
-  totalActive:   number
-  todayPending:  number
-  upcomingDue:   number
+  doneToday: number
+  totalToday: number
+  doneOverall: number
+  totalOverall: number
+  totalActive: number
+  todayPending: number
+  upcomingDue: number
   missedDeadlineCount: number
   progressPenaltyPercent: number
-  progress:      number
-  overdueCount:  number
-  recentNotes:   { id: string; title: string; content: string }[]
-  latestNotifs:  { id: string; type: string; title: string; message: string; isRead: boolean; createdAt: string | Date }[]
-  unreadNotifs:  number
+  progress: number
+  overdueCount: number
+  recentNotes: { id: string; title: string; content: string }[]
+  latestNotifs: { id: string; type: string; title: string; message: string; isRead: boolean; createdAt: string | Date }[]
+  unreadNotifs: number
   history: {
     date: string | Date
     totalTasks: number
@@ -51,34 +51,18 @@ export interface DashboardStats {
     endTime: string | null
     place: string | null
   }[]
-  activityMetrics: {
-    scheduleMinutesTotal: number
-    taskRemainingMinutesTotal: number
-    pendingTaskCount: number
-    taskRemainders: { id: string; title: string; remainingMinutes: number }[]
-  }
 }
 
 type Status = 'connecting' | 'live' | 'reconnecting' | 'offline'
 
-const emptyActivity: DashboardStats['activityMetrics'] = {
-  scheduleMinutesTotal: 0,
-  taskRemainingMinutesTotal: 0,
-  pendingTaskCount: 0,
-  taskRemainders: [],
-}
-
 export function useDashboardStream(initial: DashboardStats) {
-  const [stats, setStats] = useState<DashboardStats>(() => ({
-    ...initial,
-    activityMetrics: initial.activityMetrics ?? emptyActivity,
-  }))
+  const [stats, setStats] = useState<DashboardStats>(initial)
   const [status, setStatus] = useState<Status>('connecting')
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(Date.now())
-  const esRef    = useRef<EventSource | null>(null)
+  const esRef = useRef<EventSource | null>(null)
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const healthRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const attempt  = useRef(0)
+  const attempt = useRef(0)
 
   const connect = () => {
     esRef.current?.close()
@@ -95,13 +79,12 @@ export function useDashboardStream(initial: DashboardStats) {
     es.onmessage = (e) => {
       try {
         const data: DashboardStats = JSON.parse(e.data)
-        setStats({
-          ...data,
-          activityMetrics: data.activityMetrics ?? emptyActivity,
-        })
+        setStats(data)
         setStatus('live')
         setLastUpdatedAt(Date.now())
-      } catch {  }
+      } catch {
+        /* ignore */
+      }
     }
 
     es.onerror = () => {

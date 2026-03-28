@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { formatRemainingBeforeDeadline, formatSlotDurationLabel } from '@/lib/activity-metrics'
 import { WEEKDAY_LABELS, mondayFirstIndex } from '@/lib/schedule-week'
 
 type CalendarTask = {
@@ -377,16 +378,20 @@ export default function CalendarPage() {
                   <div className="schedule-summary-empty">—</div>
                 ) : (
                   <ul className="schedule-summary-list">
-                    {slots.map((s) => (
+                    {slots.map((s) => {
+                      const dur = formatSlotDurationLabel(s.startTime, s.endTime)
+                      return (
                       <li key={s.id}>
                         <span className="schedule-summary-title">{s.title}</span>
                         {(s.startTime || s.endTime) && (
                           <span className="schedule-summary-time">
                             {s.startTime ?? '—'} – {s.endTime ?? '—'}
+                            {dur && <> · {dur}</>}
                           </span>
                         )}
                       </li>
-                    ))}
+                      )
+                    })}
                   </ul>
                 )}
               </div>
@@ -458,7 +463,9 @@ export default function CalendarPage() {
                 <div className="agenda-block">
                   <div className="agenda-block-title">Jadwal kuliah / sekolah</div>
                   <div className="agenda-list">
-                    {selectedScheduleSlots.map((s) => (
+                    {selectedScheduleSlots.map((s) => {
+                      const dur = formatSlotDurationLabel(s.startTime, s.endTime)
+                      return (
                       <div key={s.id} className="agenda-item agenda-schedule">
                         <div className="agenda-title-row">
                           <div className="agenda-title">{s.title}</div>
@@ -467,7 +474,10 @@ export default function CalendarPage() {
                         <div className="agenda-meta">
                           {(s.startTime || s.endTime) && (
                             <>
-                              <span>{s.startTime ?? '—'} – {s.endTime ?? '—'}</span>
+                              <span>
+                                {s.startTime ?? '—'} – {s.endTime ?? '—'}
+                                {dur && <> · {dur}</>}
+                              </span>
                               {s.place && (
                                 <>
                                   <span className="dot-sep">•</span>
@@ -479,7 +489,8 @@ export default function CalendarPage() {
                           {!s.startTime && !s.endTime && s.place && <span>{s.place}</span>}
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -487,7 +498,9 @@ export default function CalendarPage() {
                 <div className="agenda-block">
                   <div className="agenda-block-title">Tugas</div>
                   <div className="agenda-list">
-                    {selectedTasks.map((task) => (
+                    {selectedTasks.map((task) => {
+                      const rem = task.deadline ? formatRemainingBeforeDeadline(task.deadline, task.status) : null
+                      return (
                       <div key={task.id} className={`agenda-item priority-${task.priority.toLowerCase()}`}>
                         <div className="agenda-title-row">
                           <div className="agenda-title">{task.title}</div>
@@ -499,9 +512,16 @@ export default function CalendarPage() {
                           <span>{task.subject || 'Umum'}</span>
                           <span className="dot-sep">•</span>
                           <span>Prioritas {task.priority}</span>
+                          {rem && (
+                            <>
+                              <span className="dot-sep">•</span>
+                              <span>{rem}</span>
+                            </>
+                          )}
                         </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -546,7 +566,9 @@ export default function CalendarPage() {
                     {(slotsByDay[idx] ?? []).length === 0 ? (
                       <p className="schedule-day-empty text-muted small mb-0">Belum ada jadwal — klik + Mapel</p>
                     ) : (
-                      (slotsByDay[idx] ?? []).map((row, ridx) => (
+                      (slotsByDay[idx] ?? []).map((row, ridx) => {
+                        const slotDur = formatSlotDurationLabel(row.startTime, row.endTime)
+                        return (
                         <div key={`${idx}-${ridx}`} className="schedule-slot-card">
                           <div className="schedule-slot-card-top">
                             <span className="schedule-slot-num">{ridx + 1}</span>
@@ -590,8 +612,14 @@ export default function CalendarPage() {
                               onChange={(e) => updateSlotRow(idx, ridx, { place: e.target.value })}
                             />
                           </div>
+                          {slotDur && (
+                            <div className="small mb-0 mt-1" style={{ fontSize: 11 }}>
+                              {slotDur}
+                            </div>
+                          )}
                         </div>
-                      ))
+                        )
+                      })
                     )}
                   </div>
                 ))}
