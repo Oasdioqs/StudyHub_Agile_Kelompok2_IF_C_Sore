@@ -32,7 +32,6 @@ export function isScheduleDbUnavailable(e: unknown): boolean {
   return false
 }
 
-/** Jadwal hari ini untuk dashboard; [] jika tabel belum dimigrasi atau client Prisma belum di-generate ulang. */
 export async function findTodayScheduleForDashboard(userId: string, dayOfWeek: number): Promise<TodayScheduleSlot[]> {
   try {
     return await db.weeklyScheduleSlot.findMany({

@@ -82,9 +82,7 @@ export function useDashboardStream(initial: DashboardStats) {
         setStats(data)
         setStatus('live')
         setLastUpdatedAt(Date.now())
-      } catch {
-        /* ignore */
-      }
+      } catch {}
     }
 
     es.onerror = () => {

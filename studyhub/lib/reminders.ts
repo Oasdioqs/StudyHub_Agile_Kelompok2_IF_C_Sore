@@ -37,7 +37,6 @@ async function notificationExists(userId: string, link: string) {
   return Boolean(n)
 }
 
-/** Pengingat jadwal (2h & 1h sebelum mulai) dan tugas (2h & 1h sebelum deadline). WIB. */
 export async function ensureRemindersForUser(
   userId: string,
   opts: {
@@ -100,7 +99,6 @@ export async function ensureRemindersForUser(
   }
 }
 
-/** Untuk cron: semua user yang punya jadwal mingguan atau tugas mendatang. */
 export async function ensureRemindersForAllUsers() {
   const [slotGroups, taskGroups] = await Promise.all([
     db.weeklyScheduleSlot.groupBy({ by: ['userId'], _count: { _all: true } }),
@@ -124,8 +122,6 @@ export async function ensureRemindersForAllUsers() {
     try {
       const todaySchedule = await findTodayScheduleForDashboard(userId, todayDow)
       await ensureRemindersForUser(userId, { jakartaNow, todayStart, todaySchedule })
-    } catch {
-      /* skip user on error */
-    }
+    } catch {}
   }
 }

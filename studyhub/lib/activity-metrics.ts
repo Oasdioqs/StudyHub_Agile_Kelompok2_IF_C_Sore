@@ -9,7 +9,6 @@ function parseHHMM(s: string | null | undefined): { h: number; m: number } | nul
   return { h, m: min }
 }
 
-/** Durasi satu slot dalam menit; butuh start & end. */
 export function slotDurationMinutes(startTime: string | null | undefined, endTime: string | null | undefined): number {
   const a = parseHHMM(startTime)
   const b = parseHHMM(endTime)
@@ -29,14 +28,12 @@ export function formatDurationMinutes(totalMinutes: number): string {
   return `${h} j ${m} m`
 }
 
-/** Label singkat di samping jam jadwal, mis. "Durasi 1 j 30 m" */
 export function formatSlotDurationLabel(startTime: string | null | undefined, endTime: string | null | undefined): string | null {
   const mins = slotDurationMinutes(startTime, endTime)
   if (mins <= 0) return null
   return `Durasi ${formatDurationMinutes(mins)}`
 }
 
-/** Sisa waktu sebelum deadline (tugas belum selesai). */
 export function formatRemainingBeforeDeadline(
   deadline: string | Date | null | undefined,
   status: string,

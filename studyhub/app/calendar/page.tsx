@@ -94,9 +94,7 @@ export default function CalendarPage() {
         try {
           const j = (await res.json()) as { error?: string }
           if (typeof j?.error === 'string' && j.error) msg = j.error
-        } catch {
-          /* ignore */
-        }
+        } catch {}
         if (res.status === 401) msg = 'Sesi habis. Silakan login lagi.'
         setScheduleLoadError(msg)
         return

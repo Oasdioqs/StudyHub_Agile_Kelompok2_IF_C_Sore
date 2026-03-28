@@ -66,7 +66,6 @@ export function formatJakartaDate(
   return date.toLocaleDateString(locale, { ...options, timeZone: JAKARTA_TZ })
 }
 
-/** Senin = 0 … Minggu = 6 (sama seperti penyimpanan WeeklyScheduleSlot.dayOfWeek) */
 export function getJakartaMondayFirstIndex(base = new Date()): number {
   const p = getJakartaParts(base)
   const utcNoon = Date.UTC(p.year, p.month - 1, p.day, 12 - 7, 0, 0, 0)
@@ -74,7 +73,6 @@ export function getJakartaMondayFirstIndex(base = new Date()): number {
   return g === 0 ? 6 : g - 1
 }
 
-/** YYYY-MM-DD di zona Asia/Jakarta */
 export function formatJakartaYmd(base = new Date()): string {
   const p = getJakartaParts(base)
   return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`

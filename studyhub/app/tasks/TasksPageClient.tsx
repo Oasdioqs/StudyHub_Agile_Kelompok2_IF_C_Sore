@@ -37,7 +37,6 @@ function parseYmd(s: string): { y: number; m: number; d: number } {
   return { y, m, d }
 }
 
-/** Selisih hari kalender (deadline − hari ini) di zona Jakarta */
 function dayDiffFromToday(todayKey: string, deadlineKey: string): number {
   const a = parseYmd(todayKey)
   const b = parseYmd(deadlineKey)

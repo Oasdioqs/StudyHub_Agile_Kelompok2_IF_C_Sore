@@ -1,4 +1,3 @@
-/** Indeks 0 = Senin … 6 = Minggu (bukan JS getDay) */
 export const WEEKDAY_LABELS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'] as const
 
 export function mondayFirstIndex(d: Date): number {
