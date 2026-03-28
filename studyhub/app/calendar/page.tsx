@@ -70,6 +70,8 @@ export default function CalendarPage() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [slotsByDay, setSlotsByDay] = useState<Record<number, DaySlot[]>>(() => emptySlotsByDay())
   const [savingSchedule, setSavingSchedule] = useState(false)
+  const [scheduleLoadError, setScheduleLoadError] = useState<string | null>(null)
+  const [scheduleSaveError, setScheduleSaveError] = useState<string | null>(null)
 
   const loadTasks = useCallback(async () => {
     try {
@@ -84,15 +86,26 @@ export default function CalendarPage() {
 
   const loadSchedule = useCallback(async () => {
     try {
-      const res = await fetch('/api/schedule', { cache: 'no-store' })
+      const res = await fetch('/api/schedule', { cache: 'no-store', credentials: 'same-origin' })
       if (!res.ok) {
         setScheduleSlots([])
+        let msg = 'Gagal memuat jadwal.'
+        try {
+          const j = (await res.json()) as { error?: string }
+          if (typeof j?.error === 'string' && j.error) msg = j.error
+        } catch {
+          /* ignore */
+        }
+        if (res.status === 401) msg = 'Sesi habis. Silakan login lagi.'
+        setScheduleLoadError(msg)
         return
       }
+      setScheduleLoadError(null)
       const data = (await res.json().catch(() => [])) as ScheduleSlot[]
       setScheduleSlots(Array.isArray(data) ? data : [])
     } catch {
       setScheduleSlots([])
+      setScheduleLoadError('Gagal memuat jadwal (jaringan).')
     }
   }, [])
 
@@ -212,6 +225,7 @@ export default function CalendarPage() {
   }, [tasks, todayKey])
 
   const openScheduleModal = () => {
+    setScheduleSaveError(null)
     setSlotsByDay(buildSlotsByDay(scheduleSlots))
     setScheduleModalOpen(true)
   }
@@ -243,9 +257,11 @@ export default function CalendarPage() {
 
   const saveSchedule = async (e: React.FormEvent) => {
     e.preventDefault()
+    setScheduleSaveError(null)
     setSavingSchedule(true)
     try {
       const slots: { dayOfWeek: number; title: string; startTime: string | null; endTime: string | null; place: string | null }[] = []
+      const rowsExist = Object.values(slotsByDay).some((rows) => (rows?.length ?? 0) > 0)
       for (let d = 0; d < 7; d++) {
         for (const row of slotsByDay[d] ?? []) {
           const title = row.title.trim()
@@ -259,13 +275,32 @@ export default function CalendarPage() {
           })
         }
       }
+      if (slots.length === 0 && rowsExist) {
+        setScheduleSaveError('Isi nama mata kuliah (wajib) pada baris yang ingin disimpan.')
+        return
+      }
       const res = await fetch('/api/schedule', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ slots }),
       })
-      const data = (await res.json().catch(() => [])) as ScheduleSlot[]
-      if (Array.isArray(data)) setScheduleSlots(data)
+      const raw = await res.json().catch(() => null)
+      if (!res.ok) {
+        let msg = 'Gagal menyimpan jadwal.'
+        if (raw && typeof raw === 'object' && 'error' in raw && typeof (raw as { error?: string }).error === 'string') {
+          msg = (raw as { error: string }).error
+        } else if (res.status === 401) {
+          msg = 'Sesi habis. Silakan login lagi.'
+        }
+        setScheduleSaveError(msg)
+        return
+      }
+      if (!Array.isArray(raw)) {
+        setScheduleSaveError('Respons server tidak valid.')
+        return
+      }
+      setScheduleSlots(raw)
       setScheduleModalOpen(false)
     } finally {
       setSavingSchedule(false)
@@ -305,6 +340,12 @@ export default function CalendarPage() {
           </div>
         </div>
       </div>
+
+      {scheduleLoadError && (
+        <div className="alert alert-warning py-2 px-3 mb-0" role="alert">
+          <strong>Jadwal:</strong> {scheduleLoadError}
+        </div>
+      )}
 
       <div className="stats-row">
         <div className="stats-card">
@@ -487,6 +528,11 @@ export default function CalendarPage() {
             <p className="schedule-modal-desc text-muted small">
               Per hari bisa beberapa mapel: pakai tombol &quot;+ Mapel&quot;. Baris tanpa judul diabaikan saat simpan. Jadwal tampil di ringkasan, kalender, dan dashboard (hari ini · WIB).
             </p>
+            {scheduleSaveError && (
+              <div className="alert alert-danger py-2 px-3 small mb-3" role="alert">
+                {scheduleSaveError}
+              </div>
+            )}
             <form onSubmit={saveSchedule}>
               <div className="schedule-day-rows">
                 {WEEKDAY_LABELS.map((label, idx) => (

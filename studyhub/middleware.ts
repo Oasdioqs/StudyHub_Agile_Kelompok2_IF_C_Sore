@@ -18,6 +18,8 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     '/dashboard/:path*',
+    '/calendar',
+    '/calendar/:path*',
     '/tasks/:path*',
     '/notes/:path*',
     '/forum/:path*',
