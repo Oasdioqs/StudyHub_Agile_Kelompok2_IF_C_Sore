@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getUserIdFromRequest } from '@/lib/api-session'
 import { db } from '@/lib/db'
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = await getUserIdFromRequest(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
@@ -14,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const tasks = await db.task.findMany({
     where: {
-      userId: session.user.id,
+      userId,
       ...(status && { status: status as any }),
       ...(priority && { priority: priority as any }),
       ...(q && {
@@ -35,8 +34,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = await getUserIdFromRequest(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const { title, description, deadline, priority, subject } = body
@@ -51,16 +50,16 @@ export async function POST(req: NextRequest) {
         deadline: deadline ? new Date(deadline) : null,
         priority: priority ?? 'MEDIUM',
         subject,
-        userId: session.user.id,
+        userId,
       },
     }),
     db.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: { points: { increment: 2 } },
     }),
     db.notification.create({
       data: {
-        userId: session.user.id,
+        userId,
         type: 'TASK_CREATED',
         title: 'Tugas baru ditambahkan',
         message: `Tugas "${title}" berhasil ditambahkan${deadline ? ` (deadline ${new Date(deadline).toLocaleString('id-ID')})` : ''}.`,

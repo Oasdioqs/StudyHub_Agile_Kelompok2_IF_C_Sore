@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getUserIdFromRequest } from '@/lib/api-session'
 import { db } from '@/lib/db'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = await getUserIdFromRequest(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const existingTask = await db.task.findFirst({
-    where: { id: params.id, userId: session.user.id },
+    where: { id: params.id, userId },
     select: { id: true, status: true, title: true, deadline: true },
   })
   if (!existingTask) return NextResponse.json({ error: 'Tidak ditemukan' }, { status: 404 })
@@ -41,12 +40,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         },
       }),
       db.user.update({
-        where: { id: session.user.id },
+        where: { id: userId },
         data: { points: { increment: 10 } },
       }),
       db.notification.create({
         data: {
-          userId: session.user.id,
+          userId,
           type: completedLate ? 'TASK_COMPLETED_LATE' : 'TASK_COMPLETED',
           title: notifTitle,
           message: notifMessage,
@@ -73,11 +72,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = await getUserIdFromRequest(req)
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const task = await db.task.findFirst({
-    where: { id: params.id, userId: session.user.id },
+    where: { id: params.id, userId },
   })
   if (!task) return NextResponse.json({ error: 'Tidak ditemukan' }, { status: 404 })
 
