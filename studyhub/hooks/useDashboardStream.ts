@@ -51,12 +51,28 @@ export interface DashboardStats {
     endTime: string | null
     place: string | null
   }[]
+  activityMetrics: {
+    scheduleMinutesTotal: number
+    taskRemainingMinutesTotal: number
+    pendingTaskCount: number
+    taskRemainders: { id: string; title: string; remainingMinutes: number }[]
+  }
 }
 
 type Status = 'connecting' | 'live' | 'reconnecting' | 'offline'
 
+const emptyActivity: DashboardStats['activityMetrics'] = {
+  scheduleMinutesTotal: 0,
+  taskRemainingMinutesTotal: 0,
+  pendingTaskCount: 0,
+  taskRemainders: [],
+}
+
 export function useDashboardStream(initial: DashboardStats) {
-  const [stats, setStats]   = useState<DashboardStats>(initial)
+  const [stats, setStats] = useState<DashboardStats>(() => ({
+    ...initial,
+    activityMetrics: initial.activityMetrics ?? emptyActivity,
+  }))
   const [status, setStatus] = useState<Status>('connecting')
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(Date.now())
   const esRef    = useRef<EventSource | null>(null)
@@ -79,7 +95,10 @@ export function useDashboardStream(initial: DashboardStats) {
     es.onmessage = (e) => {
       try {
         const data: DashboardStats = JSON.parse(e.data)
-        setStats(data)
+        setStats({
+          ...data,
+          activityMetrics: data.activityMetrics ?? emptyActivity,
+        })
         setStatus('live')
         setLastUpdatedAt(Date.now())
       } catch {  }

@@ -5,6 +5,7 @@ import axios from 'axios'
 import Link from 'next/link'
 import { LiftCard, QuickLinkCard, TaskItem, NoteCard } from './HoverCard'
 import { useDashboardStream, DashboardStats } from '@/hooks/useDashboardStream'
+import { formatDurationMinutes } from '@/lib/activity-metrics'
 import { WEEKDAY_LABELS } from '@/lib/schedule-week'
 import { getJakartaMondayFirstIndex } from '@/lib/jakarta-time'
 
@@ -105,7 +106,23 @@ function LiveBadge({ status }: { status: 'connecting' | 'live' | 'reconnecting' 
 
 type StatTone = 'violet' | 'blue' | 'green' | 'red' | 'amber'
 
-function StatCard({ label, value, emoji, bg, color, tone }: { label: string; value: number; emoji: string; bg: string; color: string; tone: StatTone }) {
+function StatCard({
+  label,
+  value,
+  emoji,
+  bg,
+  color,
+  tone,
+  labelColor,
+}: {
+  label: string
+  value: number
+  emoji: string
+  bg: string
+  color: string
+  tone: StatTone
+  labelColor?: string
+}) {
   const animated = useAnimatedNumber(value)
   const toneConfig = {
     violet: { cardBg: 'linear-gradient(160deg,#ffffff,#f6f4ff)', border: '#ddd6fe', glow: 'rgba(124,58,237,0.14)' },
@@ -124,7 +141,7 @@ function StatCard({ label, value, emoji, bg, color, tone }: { label: string; val
       <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 22, fontWeight: 700, color, lineHeight: 1, marginBottom: 3, fontVariantNumeric: 'tabular-nums', position: 'relative', zIndex: 1 }}>
         {animated}
       </div>
-      <div style={{ fontSize: 11, color: '#64748b', position: 'relative', zIndex: 1 }}>{label}</div>
+      <div style={{ fontSize: 11, color: labelColor ?? '#64748b', position: 'relative', zIndex: 1 }}>{label}</div>
     </LiftCard>
   )
 }
@@ -163,6 +180,7 @@ export default function DashboardClient({
     unreadNotifs,
     history,
     todaySchedule,
+    activityMetrics,
   } = stats
   const scheduleWeekdayLabel = WEEKDAY_LABELS[getJakartaMondayFirstIndex()]
   const [liveAgeSec, setLiveAgeSec] = useState(0)
@@ -179,6 +197,13 @@ export default function DashboardClient({
   const [challengeMap, setChallengeMap] = useState<Record<string, { startedAt: number; targetMinutes: number }>>({})
   const [isDark, setIsDark] = useState(false)
   const [scheduleInfoOpen, setScheduleInfoOpen] = useState(false)
+
+  const dm = {
+    muted: isDark ? '#cbd5e1' : '#64748b',
+    muted2: isDark ? '#a8b4c8' : '#94a3b8',
+    sub: isDark ? '#e2e8f0' : '#6b7280',
+    ink: isDark ? '#f1f5f9' : '#1f2937',
+  }
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -246,6 +271,8 @@ export default function DashboardClient({
     if (type === 'TASK_COMPLETED') return { badge: '✨', bg: '#ecfdf5', dot: '#10b981' }
     if (type === 'TASK_COMPLETED_LATE') return { badge: '⚠️', bg: '#fff7ed', dot: '#f97316' }
     if (type === 'TASK_CREATED') return { badge: '📝', bg: '#eef2ff', dot: '#6366f1' }
+    if (type === 'schedule_reminder') return { badge: '📅', bg: '#e0f2fe', dot: '#0284c7' }
+    if (type === 'task_deadline_reminder') return { badge: '⏳', bg: '#fef3c7', dot: '#d97706' }
     return { badge: '•', bg: '#f8fafc', dot: '#64748b' }
   }
   const activeNotif = latestNotifs.find((n) => n.id === activeNotifId) ?? null
@@ -393,16 +420,16 @@ export default function DashboardClient({
 
       
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', gap: 10, marginBottom: 16 }}>
-        <StatCard label="Tugas Hari Ini"  value={totalOverall}                            emoji="📋" bg="#ede9fe" color="#6c63ff" tone="violet" />
-        <StatCard label="Tugas Belum Siap" value={Math.max(0, totalOverall - doneOverall)} emoji="📌" bg="#e0f2fe" color="#0ea5e9" tone="blue" />
-        <StatCard label="Tugas Udah Siap" value={doneOverall}                             emoji="✅" bg="#dcfce7" color="#16a34a" tone="green" />
-        <StatCard label="Tugas Lewat Deadline" value={missedDeadlineCount}                emoji="🚨" bg="#fee2e2" color="#dc2626" tone="red" />
-        <StatCard label="Catatan"         value={recentNotes.length}                      emoji="📒" bg="#dcfce7" color="#10b981" tone="green" />
-        <StatCard label="Notifikasi Baru" value={visibleUnreadNotifs}                     emoji="🔔" bg="#fef9c3" color="#d97706" tone="amber" />
+        <StatCard label="Tugas Hari Ini"  value={totalOverall}                            emoji="📋" bg="#ede9fe" color="#6c63ff" tone="violet" labelColor={dm.muted} />
+        <StatCard label="Tugas Belum Siap" value={Math.max(0, totalOverall - doneOverall)} emoji="📌" bg="#e0f2fe" color="#0ea5e9" tone="blue" labelColor={dm.muted} />
+        <StatCard label="Tugas Udah Siap" value={doneOverall}                             emoji="✅" bg="#dcfce7" color="#16a34a" tone="green" labelColor={dm.muted} />
+        <StatCard label="Tugas Lewat Deadline" value={missedDeadlineCount}                emoji="🚨" bg="#fee2e2" color="#dc2626" tone="red" labelColor={dm.muted} />
+        <StatCard label="Catatan"         value={recentNotes.length}                      emoji="📒" bg="#dcfce7" color="#10b981" tone="green" labelColor={dm.muted} />
+        <StatCard label="Notifikasi Baru" value={visibleUnreadNotifs}                     emoji="🔔" bg="#fef9c3" color="#d97706" tone="amber" labelColor={dm.muted} />
       </div>
 
       
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 14 }}>
         <div style={{ background: isDark ? 'linear-gradient(160deg, #111827, #1f172a)' : 'linear-gradient(160deg, #fff, #fff7f7)', borderRadius: 16, border: `1px solid ${isDark ? '#3f1f2b' : '#fee2e2'}`, padding: 16, boxShadow: isDark ? '0 12px 24px rgba(2,6,23,0.35)' : '0 12px 24px rgba(220,38,38,0.06)', position: 'relative', overflow: 'hidden' }}>
           <div
             style={{
@@ -418,7 +445,7 @@ export default function DashboardClient({
             }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600 }}>
+            <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, color: dm.ink }}>
               Deadline Radar
             </div>
             <Link href="/tasks" style={{ fontSize: 11, color: '#ef4444', textDecoration: 'none' }}>
@@ -435,33 +462,73 @@ export default function DashboardClient({
               <div style={{ fontSize: 20, fontWeight: 700, color: '#ea580c' }}>{todayPending}</div>
             </div>
             <div style={{ background: isDark ? '#10271a' : '#f0fdf4', border: `1px solid ${isDark ? '#166534' : '#bbf7d0'}`, borderRadius: 12, padding: '10px 12px' }}>
-              <div style={{ fontSize: 10, color: '#166534'} }>Mendatang</div>
+              <div style={{ fontSize: 10, color: '#166534' }}>Mendatang</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: '#16a34a' }}>{upcomingDue}</div>
             </div>
           </div>
-          <p style={{ margin: '10px 2px 0', fontSize: 11, color: '#7f1d1d' }}>
+          <p style={{ margin: '10px 2px 0', fontSize: 11, color: isDark ? '#fca5a5' : '#7f1d1d' }}>
             Prioritaskan item overdue dulu supaya progress harian tetap stabil.
           </p>
           <style>{`@keyframes overduePulse{0%,100%{transform:translateY(0);box-shadow:0 0 0 2px rgba(239,68,68,0.18)}50%{transform:translateY(-1px);box-shadow:0 0 0 4px rgba(239,68,68,0.14)}}@keyframes radarGlow{0%,100%{opacity:.75;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}`}</style>
         </div>
 
+        <div style={{ background: isDark ? 'linear-gradient(180deg, #111827, #1e1b4b)' : 'linear-gradient(180deg, #ffffff, #f5f3ff)', borderRadius: 16, border: `1px solid ${isDark ? '#4338ca' : '#e0e7ff'}`, overflow: 'hidden', boxShadow: isDark ? '0 12px 24px rgba(2,6,23,0.35)' : '0 12px 24px rgba(99,102,241,0.08)', position: 'relative' }}>
+          <div style={{ position: 'absolute', top: -48, right: -16, width: 120, height: 120, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.15), transparent 65%)', pointerEvents: 'none' }} />
+          <div style={{ padding: '14px 16px', borderBottom: `0.5px solid ${isDark ? 'rgba(148,163,184,0.15)' : 'rgba(0,0,0,0.06)'}` }}>
+            <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, color: dm.ink }}>Aktivitas Baru</div>
+            <p style={{ margin: '6px 0 0', fontSize: 10, color: dm.muted, lineHeight: 1.45 }}>
+              Durasi jadwal & sisa waktu ke deadline (WIB). Pengingat otomatis 2 jam & 1 jam sebelum jadwal mulai atau deadline tugas — cek di notifikasi.
+            </p>
+          </div>
+          <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ background: isDark ? '#1e1b4b' : '#eef2ff', borderRadius: 10, padding: '10px 12px', border: `1px solid ${isDark ? '#4f46e5' : '#c7d2fe'}` }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: dm.muted }}>Durasi jadwal hari ini</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: '#818cf8', marginTop: 4 }}>{formatDurationMinutes(activityMetrics?.scheduleMinutesTotal ?? 0)}</div>
+              </div>
+              <div style={{ background: isDark ? '#14532d' : '#f0fdf4', borderRadius: 10, padding: '10px 12px', border: `1px solid ${isDark ? '#166534' : '#bbf7d0'}` }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: dm.muted }}>Sisa waktu ke deadline</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: '#4ade80', marginTop: 4 }}>{formatDurationMinutes(activityMetrics?.taskRemainingMinutesTotal ?? 0)}</div>
+                <div style={{ fontSize: 9, color: dm.muted2, marginTop: 2 }}>{activityMetrics?.pendingTaskCount ?? 0} tugas belum selesai</div>
+              </div>
+            </div>
+            {(activityMetrics?.taskRemainders?.length ?? 0) > 0 && (
+              <div style={{ fontSize: 10, color: dm.sub }}>
+                <div style={{ fontWeight: 600, marginBottom: 4, color: dm.ink }}>Tugas terdekat:</div>
+                <ul style={{ margin: 0, paddingLeft: 16, maxHeight: 64, overflow: 'auto' }}>
+                  {(activityMetrics?.taskRemainders ?? []).slice(0, 4).map((t) => (
+                    <li key={t.id} style={{ marginBottom: 3 }}>
+                      {t.title} — {formatDurationMinutes(t.remainingMinutes)} lagi
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div style={{ background: isDark ? 'linear-gradient(180deg, #111827, #0f172a)' : 'linear-gradient(180deg, #ffffff, #f8faff)', borderRadius: 16, border: `1px solid ${isDark ? '#1f2937' : '#dbeafe'}`, overflow: 'hidden', boxShadow: isDark ? '0 12px 24px rgba(2,6,23,0.35)' : '0 12px 24px rgba(59,130,246,0.07)', position: 'relative' }}>
           <div style={{ position: 'absolute', top: -64, right: -20, width: 140, height: 140, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,70,229,0.12), transparent 65%)', pointerEvents: 'none' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '0.5px solid rgba(0,0,0,0.06)', background: 'rgba(79,70,229,0.04)' }}>
-            <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: `0.5px solid ${isDark ? 'rgba(148,163,184,0.15)' : 'rgba(0,0,0,0.06)'}`, background: isDark ? 'rgba(79,70,229,0.08)' : 'rgba(79,70,229,0.04)' }}>
+            <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, color: dm.ink }}>
               Aktivitas Terbaru
             </div>
-            <span style={{ fontSize: 11, color: '#64748b' }}>{latestNotifs.length} item</span>
+            <span style={{ fontSize: 11, color: dm.muted }}>{latestNotifs.length} item</span>
           </div>
           {latestNotifs.length === 0 ? (
-            <div style={{ padding: 18, fontSize: 12, color: '#94a3b8' }}>Belum ada notifikasi terbaru.</div>
+            <div style={{ padding: 18, fontSize: 12, color: dm.muted }}>Belum ada notifikasi terbaru.</div>
           ) : (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', height: 136, overflowY: 'auto', scrollbarGutter: 'stable' }}>
               {latestNotifs.map((n) => (
                 <li
                   key={n.id}
                   onClick={() => setActiveNotifId(n.id)}
-                  style={{ padding: '11px 16px', borderBottom: '0.5px solid rgba(0,0,0,0.05)', background: n.isRead ? '#fff' : '#eef2ff', cursor: 'pointer' }}
+                  style={{
+                    padding: '11px 16px',
+                    borderBottom: `0.5px solid ${isDark ? 'rgba(148,163,184,0.12)' : 'rgba(0,0,0,0.05)'}`,
+                    background: n.isRead ? (isDark ? '#0f172a' : '#fff') : (isDark ? '#1e293b' : '#eef2ff'),
+                    cursor: 'pointer',
+                  }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                     <div style={{ minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -469,11 +536,11 @@ export default function DashboardClient({
                         {notificationTone(n.type).badge}
                       </span>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: dm.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {n.title}
                         </div>
-                        <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.message}</div>
-                        <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: dm.sub, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.message}</div>
+                        <div style={{ fontSize: 10.5, color: dm.muted2, marginTop: 2 }}>
                           {new Date(n.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
@@ -556,8 +623,8 @@ export default function DashboardClient({
           {todayTasks.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: 8 }}>
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>✓</div>
-              <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Semua beres hari ini!</p>
-              <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>Nice, kamu lagi ahead 🚀</p>
+              <p style={{ fontSize: 13, color: dm.muted, margin: 0 }}>Semua beres hari ini!</p>
+              <p style={{ fontSize: 11, color: dm.muted2, margin: 0 }}>Nice, kamu lagi ahead 🚀</p>
             </div>
           ) : (
             <ul style={{ padding: 0, margin: 0, height: 136, overflowY: 'auto', scrollbarGutter: 'stable' }}>
@@ -620,13 +687,13 @@ export default function DashboardClient({
               Kalender
             </Link>
           </div>
-          <div style={{ padding: '0 16px 10px', fontSize: 10, color: '#64748b', lineHeight: 1.35 }}>
+          <div style={{ padding: '0 16px 10px', fontSize: 10, color: dm.muted, lineHeight: 1.35 }}>
             Kuliah & sekolah · hari {scheduleWeekdayLabel} (WIB)
           </div>
           {todaySchedule.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '28px 16px', gap: 8 }}>
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#ccfbf1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📅</div>
-              <p style={{ fontSize: 13, color: '#64748b', margin: 0, textAlign: 'center' }}>Belum ada jadwal untuk hari ini</p>
+              <p style={{ fontSize: 13, color: dm.muted, margin: 0, textAlign: 'center' }}>Belum ada jadwal untuk hari ini</p>
               <Link href="/calendar" style={{ fontSize: 11, color: '#0d9488', fontWeight: 600 }}>
                 Atur di Kalender →
               </Link>
@@ -666,8 +733,8 @@ export default function DashboardClient({
           {recentNotes.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: 8 }}>
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>📝</div>
-              <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Belum ada catatan</p>
-              <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>Mulai nulis, ide kamu worth it ✨</p>
+              <p style={{ fontSize: 13, color: dm.muted, margin: 0 }}>Belum ada catatan</p>
+              <p style={{ fontSize: 11, color: dm.muted2, margin: 0 }}>Mulai nulis, ide kamu worth it ✨</p>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, padding: 12 }}>
