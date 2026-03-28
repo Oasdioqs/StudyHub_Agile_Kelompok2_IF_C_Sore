@@ -502,6 +502,7 @@ Didistribusikan di bawah **MIT License** — bebas digunakan, dimodifikasi, dan 
 |  | Project Lead / Full-stack Dev | kelvin.chen996@gmail.com |
 |  | Project Lead / Full-stack Dev | kelvin.chen996@gmail.com |
 | Steven Aurelio | Anggota | 201111110 |
+| Stevania| Anggota | 241111218 |
 
 ---
 
