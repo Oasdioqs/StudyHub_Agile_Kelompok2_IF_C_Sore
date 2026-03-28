@@ -499,9 +499,8 @@ Didistribusikan di bawah **MIT License** — bebas digunakan, dimodifikasi, dan 
 | Nama | Role | NIM |
 |------|------|--------|
 |  | Project Lead / Full-stack Dev | kelvin.chen996@gmail.com |
-|  | Project Lead / Full-stack Dev | kelvin.chen996@gmail.com |
 | Bryan Chandra | Full-Stack Developer | 241110637 |
-| Steven Aurelio | Anggota | 201111110 |
+| Steven Aurelio | Analyst | 201111110 |
 | Stevania| Anggota | 241111218 |
 
 ---
