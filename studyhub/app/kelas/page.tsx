@@ -94,7 +94,7 @@ export default function KelasIndex() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
         <div>
-          <h4 className="mb-1 fw-bold text-dark" style={{ letterSpacing: '-0.3px' }}>Daftar Kelas</h4>
+          <h4 className="mb-1 fw-bold" style={{ letterSpacing: '-0.3px', color: 'var(--sh-text)' }}>Daftar Kelas</h4>
           <p className="text-secondary mb-0 small fw-medium">Gabung kelas atau buat kelas untuk kelompokmu.</p>
         </div>
         <div className="d-flex gap-2">
@@ -115,7 +115,7 @@ export default function KelasIndex() {
       ) : kelasList.length === 0 ? (
         <div className="text-center py-5">
           <i className="bi bi-people-fill d-block mb-3 text-secondary opacity-50" style={{ fontSize: '3rem' }}></i>
-          <h5 className="fw-bold text-dark">Kamu belum bergabung di kelas apapun.</h5>
+          <h5 className="fw-bold" style={{ color: 'var(--sh-text)' }}>Kamu belum bergabung di kelas apapun.</h5>
           <p className="text-secondary small fw-medium">Buat kelas baru sebagai komisaris atau gabung dengan kode undangan.</p>
           <button className="btn btn-primary mt-3 rounded-pill px-4 fw-bold shadow-sm" onClick={() => setShowJoinModal(true)} style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none' }}>
             <i className="bi bi-rocket-takeoff-fill me-2"></i> Gabung Sekarang
@@ -129,7 +129,7 @@ export default function KelasIndex() {
                 <div className="card h-100 border-0 shadow-sm" style={{ transition: 'transform 0.2s, box-shadow 0.2s', borderRadius: '20px', backgroundColor: 'var(--sh-card-bg)', border: '1px solid rgba(0,0,0,0.05)' }} onMouseOver={(e: any) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }} onMouseOut={(e: any) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--bs-box-shadow-sm)' }}>
                   <div className="card-body p-4">
                     <div className="d-flex justify-content-between align-items-start mb-2">
-                      <h5 className="card-title text-truncate fw-bold mb-0 text-dark" style={{ maxWidth: '75%', fontSize: '1.1rem' }}>{k.name}</h5>
+                      <h5 className="card-title text-truncate fw-bold mb-0" style={{ maxWidth: '75%', fontSize: '1.1rem', color: 'var(--sh-text)' }}>{k.name}</h5>
                       <span className={`badge ${k.role === 'ADMIN' ? 'bg-primary' : 'bg-light text-secondary border'} rounded-pill`} style={{ fontSize: '0.65rem', padding: '5px 10px' }}>
                         {k.role === 'ADMIN' ? 'Komisaris' : 'Anggota'}
                       </span>
@@ -138,7 +138,7 @@ export default function KelasIndex() {
                     <p className="card-text text-secondary small fw-medium" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.6' }}>
                       {k.description || 'Deskripsi kelas belum ditambahkan oleh komisaris.'}
                     </p>
-                    <div className="d-flex gap-3 small mt-auto pt-3 border-top" style={{ color: '#475569', fontWeight: 600 }}>
+                    <div className="d-flex gap-3 small mt-auto pt-3 border-top" style={{ color: 'var(--sh-muted)', fontWeight: 600 }}>
                       <div className="d-flex align-items-center gap-1 px-2 py-1 bg-light rounded-pill"><i className="bi bi-people-fill text-primary"></i>{k.memberCount}</div>
                       <div className="d-flex align-items-center gap-1 px-2 py-1 bg-light rounded-pill"><i className="bi bi-journal-bookmark-fill text-warning"></i>{k.taskCount}</div>
                     </div>

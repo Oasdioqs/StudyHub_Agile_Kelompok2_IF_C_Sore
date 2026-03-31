@@ -839,3 +839,126 @@ body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
 }
+
+/* ─── Bootstrap utility overrides for dark mode ─────────────────────────── */
+
+:root[data-theme='dark'] .bg-white {
+  background-color: var(--sh-card-bg) !important;
+}
+:root[data-theme='dark'] .bg-light {
+  background-color: #1e293b !important;
+}
+:root[data-theme='dark'] .text-dark {
+  color: var(--sh-text) !important;
+}
+
+:root[data-theme='dark'] .btn-light {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: var(--sh-text) !important;
+}
+:root[data-theme='dark'] .btn-light:hover,
+:root[data-theme='dark'] .btn-light:focus {
+  background-color: #273549 !important;
+  border-color: #3f536b !important;
+}
+
+:root[data-theme='dark'] .dropdown-item:hover,
+:root[data-theme='dark'] .dropdown-item:focus {
+  background-color: #1f2937 !important;
+  color: var(--sh-text) !important;
+}
+
+:root[data-theme='dark'] .list-group-item {
+  background-color: var(--sh-card-bg);
+  color: var(--sh-text);
+  border-color: var(--sh-border);
+}
+:root[data-theme='dark'] .list-group-item-action:hover {
+  background-color: #1e293b !important;
+}
+
+/* Alert dark variants */
+:root[data-theme='dark'] .alert-primary {
+  background-color: rgba(79, 70, 229, 0.15) !important;
+  color: #c7d2fe !important;
+  border-color: rgba(79, 70, 229, 0.35) !important;
+}
+:root[data-theme='dark'] .alert-info {
+  background-color: rgba(14, 165, 233, 0.15) !important;
+  color: #7dd3fc !important;
+  border-color: rgba(14, 165, 233, 0.35) !important;
+}
+:root[data-theme='dark'] .alert-success {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+:root[data-theme='dark'] .alert-danger {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  color: #fca5a5 !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+:root[data-theme='dark'] .alert-warning {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+  color: #fcd34d !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+/* Badge dark variants */
+:root[data-theme='dark'] .badge-HIGH   { background-color: rgba(239, 68,  68,  0.18); color: #fca5a5; }
+:root[data-theme='dark'] .badge-MEDIUM { background-color: rgba(245, 158, 11,  0.18); color: #fcd34d; }
+:root[data-theme='dark'] .badge-LOW    { background-color: rgba(16,  185, 129, 0.18); color: #6ee7b7; }
+:root[data-theme='dark'] .badge-TODO      { background-color: rgba(100, 116, 139, 0.18); color: #94a3b8; }
+:root[data-theme='dark'] .badge-IN_PROGRESS { background-color: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+:root[data-theme='dark'] .badge-DONE  { background-color: rgba(16,  185, 129, 0.18); color: #6ee7b7; }
+
+/* Nav pills inactive tab */
+:root[data-theme='dark'] .nav-link:not(.active) {
+  color: var(--sh-muted) !important;
+}
+
+/* Timer */
+:root[data-theme='dark'] .timer-circle {
+  background: rgba(79, 70, 229, 0.12);
+}
+
+/* Chat */
+:root[data-theme='dark'] .chat-bg {
+  background: linear-gradient(-45deg, #1e293b, #0b1220, #1a1f35, #111827) !important;
+}
+:root[data-theme='dark'] .chat-bubble-ai {
+  background: rgba(30, 41, 59, 0.92);
+  color: var(--sh-text);
+}
+:root[data-theme='dark'] .chat-input-modern {
+  background: rgba(17, 24, 39, 0.9);
+  color: var(--sh-text);
+  border-color: var(--sh-border);
+}
+:root[data-theme='dark'] .chat-input-modern:focus {
+  border-color: #6366f1;
+}
+
+/* Topbar filter select */
+:root[data-theme='dark'] .topbar-filter-select {
+  background: #1e293b;
+  color: #93c5fd;
+  border-color: #334155;
+}
+
+/* Topbar suggestion separator */
+:root[data-theme='dark'] .topbar-suggestion-item {
+  border-bottom-color: var(--sh-border);
+}
+
+/* Bootstrap border dark override */
+:root[data-theme='dark'] .border {
+  border-color: var(--sh-border) !important;
+}
+:root[data-theme='dark'] .border-bottom {
+  border-bottom-color: var(--sh-border) !important;
+}
+:root[data-theme='dark'] .border-top {
+  border-top-color: var(--sh-border) !important;
+}

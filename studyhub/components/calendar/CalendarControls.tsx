@@ -111,7 +111,7 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
         onBlur={() => setTimeout(() => setIsOpen(false), 200)}
         style={{
           background: statusColors[status] || statusColors[''],
-          color: status ? '#ffffff' : '#0f172a',
+          color: status ? '#ffffff' : 'var(--sh-text)',
           borderRadius: '12px',
           fontSize: '11px',
           padding: '4px 12px',
@@ -125,12 +125,12 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
         <i className="bi bi-chevron-down" style={{ fontSize: '9px', opacity: 0.9 }}></i>
       </button>
       {isOpen && (
-        <ul className="dropdown-menu dropdown-menu-end show shadow border-0 position-absolute" style={{ top: '100%', right: 0, marginTop: '4px', borderRadius: '16px', overflow: 'hidden', minWidth: '160px', zIndex: 1050 }}>
-          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: '#0f172a' }} onClick={() => handleStatusChange('HADIR')}><i className="bi bi-check-circle text-success me-2"></i>Hadir</button></li>
-          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: '#0f172a' }} onClick={() => handleStatusChange('IZIN')}><i className="bi bi-envelope-paper text-primary me-2"></i>Izin</button></li>
-          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: '#0f172a' }} onClick={() => handleStatusChange('SAKIT')}><i className="bi bi-thermometer text-warning me-2"></i>Sakit</button></li>
+        <ul className="dropdown-menu dropdown-menu-end show shadow border-0 position-absolute" style={{ top: '100%', right: 0, marginTop: '4px', borderRadius: '16px', overflow: 'hidden', minWidth: '160px', zIndex: 1050, background: 'var(--sh-card-bg)' }}>
+          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: 'var(--sh-text)' }} onClick={() => handleStatusChange('HADIR')}><i className="bi bi-check-circle text-success me-2"></i>Hadir</button></li>
+          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: 'var(--sh-text)' }} onClick={() => handleStatusChange('IZIN')}><i className="bi bi-envelope-paper text-primary me-2"></i>Izin</button></li>
+          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: 'var(--sh-text)' }} onClick={() => handleStatusChange('SAKIT')}><i className="bi bi-thermometer text-warning me-2"></i>Sakit</button></li>
           <li><hr className="dropdown-divider m-0" /></li>
-          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: '#0f172a' }} onClick={() => handleStatusChange('TIDAK_HADIR')}><i className="bi bi-x-circle text-danger me-2"></i>Absen (Tidak Hadir)</button></li>
+          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: 'var(--sh-text)' }} onClick={() => handleStatusChange('TIDAK_HADIR')}><i className="bi bi-x-circle text-danger me-2"></i>Absen (Tidak Hadir)</button></li>
         </ul>
       )}
     </div>

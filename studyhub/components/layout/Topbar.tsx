@@ -319,7 +319,7 @@ export default function Topbar() {
                   {notifications.map((n) => (
                     <div key={n.id} className={`list-group-item list-group-item-action p-3 border-bottom-0 border-top ${n.isRead ? '' : 'bg-primary bg-opacity-10'}`} onClick={() => { setShowNotifs(false); if (n.link) router.push(n.link); }} style={{ cursor: 'pointer', transition: 'background 0.2s ease' }}>
                       <div className="d-flex w-100 justify-content-between mb-1 align-items-center">
-                        <strong className="small text-truncate me-2 fw-bold text-dark">{n.title}</strong>
+                        <strong className="small text-truncate me-2 fw-bold" style={{ color: 'var(--sh-text)' }}>{n.title}</strong>
                         <span className="badge bg-light text-secondary rounded-pill" style={{ fontSize: '10px', fontWeight: 600 }}>{timeAgo(n.createdAt)}</span>
                       </div>
                       <p className="mb-0 small text-secondary lh-sm" style={{ fontSize: '12px' }}>{n.message}</p>
@@ -343,15 +343,15 @@ export default function Topbar() {
           >
             <i className="bi bi-person-fill" style={{ fontSize: '18px' }}></i>
           </button>
-          <ul className="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-2" style={{ borderRadius: '16px', minWidth: '220px', zIndex: 1050 }}>
+          <ul className="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-2" style={{ borderRadius: '16px', minWidth: '220px', zIndex: 1050, background: 'var(--sh-card-bg)' }}>
             <li className="px-3 py-2 mb-1">
               <div className="fw-bold" style={{ fontSize: '14px', color: 'var(--sh-text)' }}>Akun Saya</div>
               <div className="text-secondary text-truncate" style={{ fontSize: '12px' }}>Pengguna StudyHub</div>
             </li>
             <li><hr className="dropdown-divider mb-1 mt-0" /></li>
-            <li><Link href="/profile" className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px' }}><i className="bi bi-person-circle me-2 text-primary"></i>Profil Utama</Link></li>
-            <li><button className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px' }} onClick={toggleTheme}><i className={`bi ${isDark ? 'bi-sun-fill text-warning' : 'bi-moon-stars-fill text-dark'} me-2`}></i>{isDark ? 'Mode Terang' : 'Mode Gelap'}</button></li>
-            <li><Link href="/profile" className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px' }}><i className="bi bi-gear-fill me-2 text-secondary"></i>Preferensi</Link></li>
+            <li><Link href="/profile" className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px', color: 'var(--sh-text)' }}><i className="bi bi-person-circle me-2 text-primary"></i>Profil Utama</Link></li>
+            <li><button className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px', color: 'var(--sh-text)' }} onClick={toggleTheme}><i className={`bi ${isDark ? 'bi-sun-fill text-warning' : 'bi-moon-stars-fill text-secondary'} me-2`}></i>{isDark ? 'Mode Terang' : 'Mode Gelap'}</button></li>
+            <li><Link href="/profile" className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px', color: 'var(--sh-text)' }}><i className="bi bi-gear-fill me-2 text-secondary"></i>Preferensi</Link></li>
             <li><hr className="dropdown-divider my-1" /></li>
             <li><Link href="/auth/login" className="dropdown-item py-2 fw-semibold rounded-3 text-danger" style={{ fontSize: '13px' }} onClick={() => fetch('/api/auth/signout', {method:'POST'})}><i className="bi bi-box-arrow-right me-2"></i>Keluar</Link></li>
           </ul>

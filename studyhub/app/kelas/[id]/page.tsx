@@ -105,10 +105,10 @@ export default function ClassDetailPage() {
 
   return (
     <div className="class-detail pb-5">
-      <div className="d-flex justify-content-between align-items-start mb-4 bg-white p-4 rounded-4 shadow-sm border" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+      <div className="d-flex justify-content-between align-items-start mb-4 p-4 rounded-4 shadow-sm border" style={{ background: 'var(--sh-card-bg)', borderColor: 'var(--sh-border)' }}>
         <div>
           <Link href="/kelas" className="btn btn-link px-0 text-decoration-none text-secondary small fw-medium mb-2 d-inline-block"><i className="bi bi-arrow-left me-1"></i>Kembali ke Daftar</Link>
-          <h3 className="fw-bold mb-1 mt-1 text-dark" style={{ letterSpacing: '-0.5px' }}>{data.name}</h3>
+          <h3 className="fw-bold mb-1 mt-1" style={{ letterSpacing: '-0.5px', color: 'var(--sh-text)' }}>{data.name}</h3>
           <p className="text-secondary small fw-medium mb-3">{data.description || 'Tidak ada deskripsi'}</p>
           <div className="d-flex flex-wrap gap-2 mt-2">
             <span className="badge bg-light text-dark border px-3 py-2 rounded-pill fw-semibold"><i className="bi bi-key-fill text-warning me-2"></i>Kode: <span className="user-select-all font-monospace">{data.inviteCode}</span></span>
@@ -163,7 +163,7 @@ export default function ClassDetailPage() {
               {data.tasks.map(t => (
                 <div key={t.id} className="list-group-item d-flex justify-content-between align-items-start p-4 rounded-4 border-0 shadow-sm" style={{ background: 'var(--sh-card-bg)' }}>
                   <div>
-                    <h6 className="mb-1 fw-bold text-dark fs-5">{t.title}</h6>
+                    <h6 className="mb-1 fw-bold fs-5" style={{ color: 'var(--sh-text)' }}>{t.title}</h6>
                     <p className="mb-2 small text-secondary fw-medium lh-lg">{t.description}</p>
                     <div className="small d-flex flex-wrap gap-2 mt-3">
                       <span className="badge bg-light text-dark border px-3 py-2 rounded-pill"><i className="bi bi-calendar-event text-primary me-2"></i>{t.deadline ? new Date(t.deadline).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Tidak ada batas waktu'}</span>
@@ -205,8 +205,8 @@ export default function ClassDetailPage() {
                         <div className="d-flex justify-content-between align-items-center mb-3">
                           <span className="badge bg-primary rounded-pill px-3 py-2 fw-bold"><i className="bi bi-calendar-day-fill me-2"></i>{days[s.dayOfWeek]}</span>
                         </div>
-                        <h5 className="text-dark fw-bold mb-3">{s.title}</h5>
-                        <div className="mt-auto small text-secondary fw-semibold bg-white p-3 rounded-3 shadow-sm">
+                        <h5 className="fw-bold mb-3" style={{ color: 'var(--sh-text)' }}>{s.title}</h5>
+                        <div className="mt-auto small text-secondary fw-semibold p-3 rounded-3 shadow-sm" style={{ backgroundColor: 'var(--sh-bg)' }}>
                           <div className="d-flex align-items-center gap-2 mb-2"><i className="bi bi-clock-history text-warning fs-6"></i> {s.startTime} - {s.endTime}</div>
                           <div className="d-flex align-items-center gap-2 m-0"><i className="bi bi-geo-alt-fill text-danger fs-6"></i> {s.place || 'Ruangan belum diatur'}</div>
                         </div>
@@ -228,7 +228,7 @@ export default function ClassDetailPage() {
                 {!m.image && m.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-grow-1">
-                <div className="fw-bold text-dark fs-6">{m.name} {m.id === data.id && <span className="text-primary ms-1">(Kamu)</span>}</div>
+                <div className="fw-bold fs-6" style={{ color: 'var(--sh-text)' }}>{m.name} {m.id === data.id && <span className="text-primary ms-1">(Kamu)</span>}</div>
                 <div className="small text-secondary fw-medium">{m.email}</div>
               </div>
               <span className={`badge ${m.role === 'ADMIN' ? 'bg-primary' : 'bg-light text-secondary border'} rounded-pill px-4 py-2 mt-2 mt-sm-0`}>
