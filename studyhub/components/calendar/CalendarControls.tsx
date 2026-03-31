@@ -56,6 +56,7 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
 export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string, slotType: 'personal' | 'class', dateStr: string }) {
   const [status, setStatus] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
     fetch(`/api/attendance?date=${dateStr}`)
@@ -70,15 +71,18 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
       .catch(() => setLoading(false))
   }, [slotId, slotType, dateStr])
 
-  const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newStatus = e.target.value
+  const handleStatusChange = async (newStatus: string) => {
     setStatus(newStatus)
+    setIsOpen(false)
     await fetch('/api/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slotId, slotType, date: dateStr, status: newStatus })
     }).catch(() => {})
   }
+
+  // Close dropdown on outside click (simple approach for standalone components by just letting onBlur handle it, or we use a ref)
+  const toggleDropdown = () => setIsOpen(!isOpen)
 
   if (loading) return null
 
@@ -99,31 +103,36 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
   }
 
   return (
-    <div className="dropdown d-inline-block ms-2">
+    <div className="position-relative d-inline-block ms-auto ms-sm-2 mt-2 mt-sm-0 flex-shrink-0" style={{ zIndex: isOpen ? 100 : 1 }}>
       <button 
+        type="button"
         className="btn btn-sm d-flex align-items-center gap-2 fw-bold shadow-sm" 
-        data-bs-toggle="dropdown" 
+        onClick={toggleDropdown}
+        onBlur={() => setTimeout(() => setIsOpen(false), 200)}
         style={{
           background: statusColors[status] || statusColors[''],
-          color: status ? '#ffffff' : '#334155',
+          color: status ? '#ffffff' : '#0f172a',
           borderRadius: '12px',
           fontSize: '11px',
           padding: '4px 12px',
-          border: '1px solid rgba(0,0,0,0.05)',
+          border: '1px solid rgba(0,0,0,0.08)',
           transition: 'all 0.2s ease',
+          whiteSpace: 'nowrap'
         }}
       >
-        <i className={`bi ${status === 'HADIR' ? 'bi-check-circle-fill' : status === 'TIDAK_HADIR' ? 'bi-x-circle-fill' : status === 'SAKIT' ? 'bi-thermometer-half' : status === 'IZIN' ? 'bi-envelope-paper-fill' : 'bi-question-circle'}`}></i>
+        <i className={`bi ${status === 'HADIR' ? 'bi-check-circle-fill' : status === 'TIDAK_HADIR' ? 'bi-x-circle-fill' : status === 'SAKIT' ? 'bi-thermometer-half' : status === 'IZIN' ? 'bi-envelope-paper-fill' : 'bi-question-circle text-primary'}`}></i>
         {statusLabels[status] || statusLabels['']}
-        <i className="bi bi-chevron-down" style={{ fontSize: '9px', opacity: 0.7 }}></i>
+        <i className="bi bi-chevron-down" style={{ fontSize: '9px', opacity: 0.9 }}></i>
       </button>
-      <ul className="dropdown-menu dropdown-menu-end shadow border-0" style={{ borderRadius: '16px', overflow: 'hidden', minWidth: '150px' }}>
-        <li><button className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px' }} onClick={() => handleStatusChange({ target: { value: 'HADIR' }} as any)}><i className="bi bi-check-circle text-success me-2"></i>Hadir</button></li>
-        <li><button className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px' }} onClick={() => handleStatusChange({ target: { value: 'IZIN' }} as any)}><i className="bi bi-envelope-paper text-primary me-2"></i>Izin</button></li>
-        <li><button className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px' }} onClick={() => handleStatusChange({ target: { value: 'SAKIT' }} as any)}><i className="bi bi-thermometer text-warning me-2"></i>Sakit</button></li>
-        <li><hr className="dropdown-divider m-0" /></li>
-        <li><button className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px' }} onClick={() => handleStatusChange({ target: { value: 'TIDAK_HADIR' }} as any)}><i className="bi bi-x-circle text-danger me-2"></i>Absen (Tidak Hadir)</button></li>
-      </ul>
+      {isOpen && (
+        <ul className="dropdown-menu dropdown-menu-end show shadow border-0 position-absolute" style={{ top: '100%', right: 0, marginTop: '4px', borderRadius: '16px', overflow: 'hidden', minWidth: '160px', zIndex: 1050 }}>
+          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: '#0f172a' }} onClick={() => handleStatusChange('HADIR')}><i className="bi bi-check-circle text-success me-2"></i>Hadir</button></li>
+          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: '#0f172a' }} onClick={() => handleStatusChange('IZIN')}><i className="bi bi-envelope-paper text-primary me-2"></i>Izin</button></li>
+          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: '#0f172a' }} onClick={() => handleStatusChange('SAKIT')}><i className="bi bi-thermometer text-warning me-2"></i>Sakit</button></li>
+          <li><hr className="dropdown-divider m-0" /></li>
+          <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: '#0f172a' }} onClick={() => handleStatusChange('TIDAK_HADIR')}><i className="bi bi-x-circle text-danger me-2"></i>Absen (Tidak Hadir)</button></li>
+        </ul>
+      )}
     </div>
   )
 }

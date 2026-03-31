@@ -475,23 +475,27 @@ export default function CalendarPage() {
                             <span className="badge schedule-badge">Jadwal</span>
                           </div>
                         </div>
-                        <div className="agenda-meta mt-1">
-                          {(s.startTime || s.endTime) && (
-                            <>
-                              <span>
-                                {s.startTime ?? '—'} – {s.endTime ?? '—'}
-                                {dur && <> · {dur}</>}
-                              </span>
-                              {s.place && (
-                                <>
-                                  <span className="dot-sep">•</span>
-                                  <span>{s.place}</span>
-                                </>
-                              )}
-                            </>
-                          )}
-                          {!s.startTime && !s.endTime && s.place && <span>{s.place}</span>}
-                          <AttendanceSelect slotId={s.id} slotType={s.groupId ? 'class' : 'personal'} dateStr={selectedKey} />
+                        <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+                          <div className="agenda-meta m-0 text-dark fw-medium" style={{ fontSize: '0.85rem' }}>
+                            {(s.startTime || s.endTime) && (
+                              <>
+                                <span>
+                                  {s.startTime ?? '—'} – {s.endTime ?? '—'}
+                                  {dur && <> · {dur}</>}
+                                </span>
+                                {s.place && (
+                                  <>
+                                    <span className="dot-sep mx-2">•</span>
+                                    <span>{s.place}</span>
+                                  </>
+                                )}
+                              </>
+                            )}
+                            {!s.startTime && !s.endTime && s.place && <span>{s.place}</span>}
+                          </div>
+                          <div className="ms-auto flex-shrink-0">
+                            <AttendanceSelect slotId={s.id} slotType={s.groupId ? 'class' : 'personal'} dateStr={selectedKey} />
+                          </div>
                         </div>
                       </div>
                       )
