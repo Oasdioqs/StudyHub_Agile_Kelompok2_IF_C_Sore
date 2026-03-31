@@ -476,7 +476,7 @@ export default function CalendarPage() {
                           </div>
                         </div>
                         <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
-                          <div className="agenda-meta m-0 text-dark fw-medium" style={{ fontSize: '0.85rem' }}>
+                          <div className="agenda-meta m-0 fw-medium" style={{ fontSize: '0.85rem', color: 'var(--sh-text)' }}>
                             {(s.startTime || s.endTime) && (
                               <>
                                 <span>
@@ -736,11 +736,17 @@ export default function CalendarPage() {
           grid-template-columns: minmax(0, 1fr) 340px;
           gap: 14px;
         }
-        .calendar-grid-card, .agenda-card {
+        .calendar-grid-card {
           background: var(--sh-card-bg);
           border: 1px solid var(--sh-border);
           border-radius: 16px;
           overflow: hidden;
+        }
+        .agenda-card {
+          background: var(--sh-card-bg);
+          border: 1px solid var(--sh-border);
+          border-radius: 16px;
+          overflow: visible;
         }
         .week-head {
           display: grid;

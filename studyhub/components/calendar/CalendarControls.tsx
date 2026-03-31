@@ -86,13 +86,26 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
 
   if (loading) return null
 
-  // Warna gradasi berdasar status persensi
   const statusColors: Record<string, string> = {
-    '': 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
-    'HADIR': 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-    'TIDAK_HADIR': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-    'SAKIT': 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-    'IZIN': 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    '': 'transparent',
+    'HADIR': 'rgba(16, 185, 129, 0.13)',
+    'TIDAK_HADIR': 'rgba(239, 68, 68, 0.13)',
+    'SAKIT': 'rgba(245, 158, 11, 0.13)',
+    'IZIN': 'rgba(59, 130, 246, 0.13)',
+  }
+  const statusTextColors: Record<string, string> = {
+    '': 'var(--sh-muted)',
+    'HADIR': '#059669',
+    'TIDAK_HADIR': '#dc2626',
+    'SAKIT': '#d97706',
+    'IZIN': '#2563eb',
+  }
+  const statusBorderColors: Record<string, string> = {
+    '': 'var(--sh-border)',
+    'HADIR': 'rgba(16, 185, 129, 0.45)',
+    'TIDAK_HADIR': 'rgba(239, 68, 68, 0.45)',
+    'SAKIT': 'rgba(245, 158, 11, 0.45)',
+    'IZIN': 'rgba(59, 130, 246, 0.45)',
   }
   const statusLabels: Record<string, string> = {
     '': 'Belum Set Presensi',
@@ -106,16 +119,16 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
     <div className="position-relative d-inline-block ms-auto ms-sm-2 mt-2 mt-sm-0 flex-shrink-0" style={{ zIndex: isOpen ? 100 : 1 }}>
       <button 
         type="button"
-        className="btn btn-sm d-flex align-items-center gap-2 fw-bold shadow-sm" 
+        className="btn btn-sm d-flex align-items-center gap-2 fw-bold" 
         onClick={toggleDropdown}
         onBlur={() => setTimeout(() => setIsOpen(false), 200)}
         style={{
-          background: statusColors[status] || statusColors[''],
-          color: status ? '#ffffff' : 'var(--sh-text)',
+          background: statusColors[status] ?? statusColors[''],
+          color: statusTextColors[status] ?? statusTextColors[''],
           borderRadius: '12px',
           fontSize: '11px',
           padding: '4px 12px',
-          border: '1px solid rgba(0,0,0,0.08)',
+          border: `1px solid ${statusBorderColors[status] ?? statusBorderColors['']}`,
           transition: 'all 0.2s ease',
           whiteSpace: 'nowrap'
         }}
