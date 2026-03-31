@@ -1,25 +1,42 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin }: { slotId: string, slotType: 'personal' | 'class', dateStr: string, groupId?: string, isAdmin?: boolean }) {
   const [mode, setMode] = useState<'LANGSUNG' | 'MAYA'>('LANGSUNG')
   const [loading, setLoading] = useState(true)
+  const [liveMeetingUrl, setLiveMeetingUrl] = useState('')
+  const [savedUrl, setSavedUrl] = useState('')
+  const [showUrlInput, setShowUrlInput] = useState(false)
+  const [savingUrl, setSavingUrl] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch(`/api/session-mode?slotId=${slotId}&slotType=${slotType}&date=${dateStr}`)
       .then(res => res.json())
       .then(data => {
         if (data.mode) setMode(data.mode)
+        const note = data.record?.note || data.note || ''
+        if (note) { setLiveMeetingUrl(note); setSavedUrl(note) }
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [slotId, slotType, dateStr])
 
+  useEffect(() => {
+    if (showUrlInput && inputRef.current) inputRef.current.focus()
+  }, [showUrlInput])
+
   const toggleMode = async () => {
     if (slotType === 'class' && !isAdmin) return
     const newMode = mode === 'LANGSUNG' ? 'MAYA' : 'LANGSUNG'
     setMode(newMode)
+    // Kalau berubah ke MAYA → tampilkan input link (personal)
+    if (newMode === 'MAYA' && slotType === 'personal') {
+      setShowUrlInput(true)
+    } else {
+      setShowUrlInput(false)
+    }
     await fetch('/api/session-mode', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -27,29 +44,124 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
     }).catch(() => setMode(mode))
   }
 
+  const handleSaveUrl = async () => {
+    setSavingUrl(true)
+    try {
+      await fetch('/api/session-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slotId, slotType, date: dateStr, mode, groupId, note: liveMeetingUrl.trim() || null })
+      })
+      setSavedUrl(liveMeetingUrl.trim())
+      setShowUrlInput(false)
+    } catch {
+    } finally {
+      setSavingUrl(false)
+    }
+  }
+
   if (loading) return <span className="spinner-border spinner-border-sm text-primary" style={{ width: '12px', height: '12px' }}></span>
 
   const canToggle = slotType === 'personal' || isAdmin
 
   return (
-    <button 
-      onClick={canToggle ? toggleMode : undefined}
-      className={`btn btn-sm d-flex align-items-center gap-1 fw-bold border-0 shadow-sm`}
-      style={{ 
-        cursor: canToggle ? 'pointer' : 'default', 
-        fontSize: '11px', 
-        padding: '4px 10px',
-        borderRadius: '12px',
-        background: mode === 'MAYA' ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-        color: '#ffffff',
-        transition: 'all 0.2s ease',
-        transform: canToggle ? 'translateY(-1px)' : 'none'
-      }}
-      title={canToggle ? "Klik untuk ubah mode" : "Mode ditetapkan oleh komisaris"}
-    >
-      <i className={`bi ${mode === 'MAYA' ? 'bi-laptop' : 'bi-person-video3'}`}></i>
-      {mode === 'MAYA' ? 'Sesi Daring' : 'Sesi Luring'}
-    </button>
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+      <button 
+        onClick={canToggle ? toggleMode : undefined}
+        className={`btn btn-sm d-flex align-items-center gap-1 fw-bold border-0 shadow-sm`}
+        style={{ 
+          cursor: canToggle ? 'pointer' : 'default', 
+          fontSize: '11px', 
+          padding: '4px 10px',
+          borderRadius: '12px',
+          background: mode === 'MAYA' ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          color: '#ffffff',
+          transition: 'all 0.2s ease',
+          transform: canToggle ? 'translateY(-1px)' : 'none'
+        }}
+        title={canToggle ? "Klik untuk ubah mode" : "Mode ditetapkan oleh komisaris"}
+      >
+        <i className={`bi ${mode === 'MAYA' ? 'bi-laptop' : 'bi-person-video3'}`}></i>
+        {mode === 'MAYA' ? 'Sesi Daring' : 'Sesi Luring'}
+      </button>
+
+      {/* Input live meeting muncul saat toggle ke MAYA (personal) */}
+      {showUrlInput && slotType === 'personal' && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: '6px',
+          background: 'var(--sh-card-bg)', border: '1.5px solid #a5b4fc',
+          borderRadius: '12px', padding: '10px 12px',
+          boxShadow: '0 4px 20px rgba(79,70,229,0.15)',
+          minWidth: '240px', zIndex: 10, position: 'relative',
+          animation: 'smt-drop 0.2s ease'
+        }}>
+          <div style={{ fontSize: '11px', fontWeight: 800, color: '#4338ca', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <i className="bi bi-camera-video-fill"></i> Link Live Meeting
+            <span style={{ fontSize: '10px', color: '#818cf8', fontWeight: 500 }}>(opsional)</span>
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input
+              ref={inputRef}
+              type="url"
+              value={liveMeetingUrl}
+              onChange={e => setLiveMeetingUrl(e.target.value)}
+              placeholder="https://meet.google.com/..."
+              style={{
+                flex: 1, padding: '6px 10px', borderRadius: '8px',
+                border: '1.5px solid #a5b4fc', fontSize: '11px',
+                background: 'var(--sh-bg)', color: 'var(--sh-text)',
+                outline: 'none'
+              }}
+              onKeyDown={e => { if (e.key === 'Enter') handleSaveUrl() }}
+            />
+            <button
+              type="button"
+              onClick={handleSaveUrl}
+              disabled={savingUrl}
+              style={{
+                background: '#4f46e5', color: 'white', border: 'none',
+                borderRadius: '8px', padding: '0 10px', cursor: 'pointer',
+                fontSize: '13px', flexShrink: 0
+              }}
+              title="Simpan"
+            >
+              {savingUrl ? '…' : <i className="bi bi-check-lg"></i>}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowUrlInput(false)}
+              style={{
+                background: 'var(--sh-bg)', color: 'var(--sh-muted)', border: '1px solid var(--sh-border)',
+                borderRadius: '8px', padding: '0 8px', cursor: 'pointer',
+                fontSize: '12px', flexShrink: 0
+              }}
+              title="Tutup"
+            >
+              <i className="bi bi-x"></i>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tampilkan link kalau tersimpan dan mode MAYA */}
+      {mode === 'MAYA' && savedUrl && !showUrlInput && (
+        <a
+          href={savedUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            fontSize: '11px', fontWeight: 700, color: '#4f46e5',
+            textDecoration: 'none', padding: '3px 8px',
+            background: '#eef2ff', borderRadius: '8px',
+            border: '1px solid #c7d2fe'
+          }}
+        >
+          <i className="bi bi-camera-video-fill"></i> Buka Live Meeting
+        </a>
+      )}
+      <style>{`@keyframes smt-drop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+    </span>
   )
 }
 

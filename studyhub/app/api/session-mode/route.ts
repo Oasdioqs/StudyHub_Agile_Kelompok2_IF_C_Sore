@@ -55,6 +55,19 @@ export async function POST(req: NextRequest) {
   normalizedDate.setUTCHours(0, 0, 0, 0)
 
   if (mode === 'LANGSUNG') {
+    // Jika ada note, simpan/update note di record yang ada — jangan hapus
+    if (note !== undefined) {
+      await db.classSessionMode.upsert({
+        where: { slotId_slotType_date: { slotId, slotType, date: normalizedDate } },
+        update: { note: note?.trim() || null },
+        create: {
+          slotId, slotType, date: normalizedDate, mode: 'LANGSUNG',
+          note: note?.trim() || null, setById: session.user.id, groupId: groupId || null,
+        },
+      })
+      return NextResponse.json({ mode: 'LANGSUNG' })
+    }
+
     // Hapus record (kembali ke default LANGSUNG)
     await db.classSessionMode.deleteMany({
       where: { slotId, slotType, date: normalizedDate },

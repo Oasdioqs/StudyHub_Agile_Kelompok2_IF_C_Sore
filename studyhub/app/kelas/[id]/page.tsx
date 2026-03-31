@@ -448,7 +448,7 @@ export default function ClassDetailPage() {
       {/* ── Tabs ── */}
       <div className="cd-tabs-wrap">
         <div className="cd-tabs">
-          {(['tasks', 'announcements', 'schedule', 'members'] as const).map((tab) => (
+          {(['announcements', 'tasks', 'schedule', 'members'] as const).map((tab) => (
             <button
               key={tab}
               className={`cd-tab ${activeTab === tab ? 'active' : ''}`}

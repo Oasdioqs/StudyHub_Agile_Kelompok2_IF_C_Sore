@@ -468,17 +468,11 @@ export default function CalendarPage() {
                   <div className="agenda-list">
                     {selectedScheduleSlots.map((s) => {
                       const dur = formatSlotDurationLabel(s.startTime, s.endTime)
-                      const isMAYA = s.syncMode === 'MAYA'
                       return (
                       <div key={s.id} className="agenda-item agenda-schedule">
                         <div className="agenda-title-row">
                           <div className="agenda-title">{s.title}</div>
                           <div className="d-flex align-items-center gap-2">
-                            {isMAYA && (
-                              <span className="badge maya-badge" title="Sinkron Maya (Online)">
-                                <i className="bi bi-display me-1"></i>Maya
-                              </span>
-                            )}
                             <SessionModeToggle slotId={s.id} slotType={s.groupId ? 'class' : 'personal'} dateStr={selectedKey} groupId={s.groupId ?? undefined} isAdmin={s.isAdmin} />
                             <span className="badge schedule-badge">Jadwal</span>
                           </div>
