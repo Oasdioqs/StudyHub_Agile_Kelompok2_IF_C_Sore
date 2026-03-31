@@ -313,10 +313,14 @@ export default function ClassDetailPage() {
     } catch { /* ignore */ }
   }
 
-  const handleToggleMode = async (slotId: string | 'all', currentMode: SyncMode) => {
+  const handleToggleMode = async (slotId: string | 'all', newMode: SyncMode) => {
     setUpdatingMode(slotId)
-    setLoadingMode(true)
-    const newMode: SyncMode = currentMode === 'LANGSUNG' ? 'MAYA' : 'LANGSUNG'
+    // Optimistic update — langsung ubah UI, tidak tunggu server
+    setLiveSchedule((prev) =>
+      prev.map((s) =>
+        slotId === 'all' || s.id === slotId ? { ...s, syncMode: newMode } : s
+      )
+    )
     try {
       const res = await fetch(`/api/kelas/${id}/schedule`, {
         method: 'PUT',
@@ -324,7 +328,6 @@ export default function ClassDetailPage() {
         body: JSON.stringify({ syncMode: newMode, ...(slotId !== 'all' ? { slotId } : {}) }),
       })
       if (res.ok) {
-        // Update liveSchedule state directly from response (includes syncMode)
         const updated = await res.json()
         if (Array.isArray(updated)) {
           setLiveSchedule(updated)
@@ -333,20 +336,16 @@ export default function ClassDetailPage() {
             if (s.liveMeetingUrl) urlMap[s.id] = s.liveMeetingUrl
           }
           setLiveMeetingUrls((prev) => ({ ...prev, ...urlMap }))
-        } else {
-          // Fallback: optimistic update
-          setLiveSchedule((prev) =>
-            prev.map((s) =>
-              slotId === 'all' || s.id === slotId ? { ...s, syncMode: newMode } : s
-            )
-          )
         }
+      } else {
+        // Revert on error — fetch ulang dari server
+        await fetchScheduleWithMode()
       }
     } catch (e) {
       console.error('Toggle mode error:', e)
+      await fetchScheduleWithMode()
     } finally {
       setUpdatingMode(null)
-      setLoadingMode(false)
     }
   }
 
@@ -615,10 +614,21 @@ export default function ClassDetailPage() {
                     <div className="cd-schedule-info-sub">Jadwal ini berlaku setiap minggu. Ubah jadwal atau atur mode pertemuan minggu ini.</div>
                   </div>
                   <div className="cd-schedule-info-actions">
-                    <button className="cd-mode-all-btn" onClick={() => handleToggleMode('all', currentWeekMode)} disabled={updatingMode === 'all' || loadingMode}>
-                      {updatingMode === 'all' ? <span className="cd-spin-sm" /> : <i className={`bi ${currentWeekMode === 'MAYA' ? 'bi-people-fill' : 'bi-display'}`} />}
-                      Set Semua: {currentWeekMode === 'MAYA' ? '→ Langsung' : '→ Sinkron Maya'}
-                    </button>
+                    <div className="cd-mode-select-row" style={{ background: 'white', border: '1.5px solid #a5b4fc', borderRadius: 10, padding: '4px 10px' }}>
+                      <i className={`bi ${currentWeekMode === 'MAYA' ? 'bi-display' : 'bi-people-fill'}`}
+                        style={{ color: currentWeekMode === 'MAYA' ? '#4f46e5' : '#059669', fontSize: 14 }} />
+                      <select
+                        className="cd-mode-select"
+                        value={currentWeekMode}
+                        disabled={updatingMode === 'all'}
+                        onChange={(e) => handleToggleMode('all', e.target.value as SyncMode)}
+                        style={{ color: currentWeekMode === 'MAYA' ? '#4f46e5' : '#059669', fontWeight: 700, fontSize: '0.8rem' }}
+                      >
+                        <option value="LANGSUNG">Semua: Sinkron Langsung</option>
+                        <option value="MAYA">Semua: Sinkron Maya</option>
+                      </select>
+                      {updatingMode === 'all' && <span className="cd-spin-sm" />}
+                    </div>
                     <button className="cd-edit-sched-btn" onClick={openScheduleModal}>
                       <i className="bi bi-pencil-square" /> Ubah Jadwal
                     </button>
@@ -655,10 +665,29 @@ export default function ClassDetailPage() {
                     <div className="cd-slot-day" style={{ color: col, background: col + '18' }}>
                       <i className="bi bi-calendar-day-fill" /> {DAYS[s.dayOfWeek]}
                     </div>
-                    <div className="cd-slot-mode-badge" style={{ background: mode === 'MAYA' ? '#eef2ff' : '#f0fdf4', color: mode === 'MAYA' ? '#4f46e5' : '#059669' }}>
-                      <i className={`bi ${mode === 'MAYA' ? 'bi-display' : 'bi-people-fill'}`} />
-                      {mode === 'MAYA' ? 'Sinkron Maya' : 'Langsung'}
-                    </div>
+                    {/* Mode selector (ADMIN: dropdown, MEMBER: read-only badge) */}
+                    {data.myRole === 'ADMIN' ? (
+                      <div className="cd-mode-select-row">
+                        <i className={`bi ${mode === 'MAYA' ? 'bi-display' : 'bi-people-fill'} cd-mode-icon`}
+                          style={{ color: mode === 'MAYA' ? '#4f46e5' : '#059669' }} />
+                        <select
+                          className="cd-mode-select"
+                          value={mode}
+                          disabled={updatingMode === s.id}
+                          onChange={(e) => handleToggleMode(s.id, e.target.value as SyncMode)}
+                          style={{ color: mode === 'MAYA' ? '#4f46e5' : '#059669' }}
+                        >
+                          <option value="LANGSUNG">Sinkron Langsung (Luring)</option>
+                          <option value="MAYA">Sinkron Maya (Online)</option>
+                        </select>
+                        {updatingMode === s.id && <span className="cd-spin-sm" />}
+                      </div>
+                    ) : (
+                      <div className="cd-slot-mode-badge" style={{ background: mode === 'MAYA' ? '#eef2ff' : '#f0fdf4', color: mode === 'MAYA' ? '#4f46e5' : '#059669' }}>
+                        <i className={`bi ${mode === 'MAYA' ? 'bi-display' : 'bi-people-fill'}`} />
+                        {mode === 'MAYA' ? 'Sinkron Maya' : 'Langsung'}
+                      </div>
+                    )}
                     <h5 className="cd-slot-title">{s.title}</h5>
                     <div className="cd-slot-meta">
                       <div><i className="bi bi-clock-history" /> {s.startTime} – {s.endTime || '?'}</div>
@@ -704,16 +733,7 @@ export default function ClassDetailPage() {
                         <i className="bi bi-camera-video-fill" /> Live Meeting
                       </a>
                     )}
-                    {data.myRole === 'ADMIN' && (
-                      <button
-                        className="cd-slot-toggle"
-                        onClick={() => handleToggleMode(s.id, mode)}
-                        disabled={updatingMode === s.id || loadingMode}
-                      >
-                        {updatingMode === s.id ? <span className="cd-spin-sm" /> : <i className={`bi ${mode === 'MAYA' ? 'bi-people-fill' : 'bi-display'}`} />}
-                        Ubah ke {mode === 'MAYA' ? 'Langsung' : 'Sinkron Maya'}
-                      </button>
-                    )}
+                    {/* Tidak ada lagi tombol toggle — diganti dropdown di atas */}
                   </div>
                 )
               })}
@@ -1347,17 +1367,20 @@ export default function ClassDetailPage() {
         .cd-slot-title { font-size: 1rem; font-weight: 800; color: var(--sh-text); margin: 0; }
         .cd-slot-meta { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; font-weight: 600; color: var(--sh-muted); }
         .cd-slot-meta i { font-size: 0.85rem; margin-right: 4px; }
-        .cd-slot-toggle {
-          display: inline-flex; align-items: center; gap: 5px;
-          padding: 6px 12px; border-radius: 999px;
-          border: 1.5px solid var(--sh-border);
-          background: var(--sh-bg); color: var(--sh-muted);
-          font-size: 0.75rem; font-weight: 700;
-          cursor: pointer; transition: all 0.15s ease;
-          margin-top: 4px;
+        .cd-mode-select-row {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 5px 12px; border-radius: 999px;
+          border: 1.5px solid #c7d2fe;
+          background: #eef2ff;
+          font-size: 0.78rem; font-weight: 700;
+          align-self: flex-start; cursor: pointer;
         }
-        .cd-slot-toggle:hover:not(:disabled) { border-color: #4f46e5; color: #4f46e5; background: #eef2ff; }
-        .cd-slot-toggle:disabled { opacity: 0.6; cursor: not-allowed; }
+        .cd-mode-select {
+          border: none; outline: none; background: transparent;
+          font-size: 0.78rem; font-weight: 700;
+          cursor: pointer; padding: 0;
+        }
+        .cd-mode-icon { font-size: 0.85rem; flex-shrink: 0; }
 
         /* ── Live Meeting Box ─────────────────────────────── */
         .cd-live-meeting-box {

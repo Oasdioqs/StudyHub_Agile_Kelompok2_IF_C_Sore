@@ -64,6 +64,25 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
 
   const canToggle = slotType === 'personal' || isAdmin
 
+  // Class slot yang bukan admin: tampilkan badge read-only (tidak bisa diubah)
+  if (!canToggle) {
+    return (
+      <span
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: '5px',
+          fontSize: '11px', fontWeight: 700, padding: '4px 10px',
+          borderRadius: '12px',
+          background: mode === 'MAYA' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'linear-gradient(135deg, #10b981, #059669)',
+          color: '#fff',
+        }}
+        title="Mode ditetapkan oleh komisaris"
+      >
+        <i className={`bi ${mode === 'MAYA' ? 'bi-laptop' : 'bi-person-video3'}`}></i>
+        {mode === 'MAYA' ? 'Sesi Daring' : 'Sesi Luring'}
+      </span>
+    )
+  }
+
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
       <button 
