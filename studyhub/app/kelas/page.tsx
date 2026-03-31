@@ -94,31 +94,31 @@ export default function KelasIndex() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
         <div>
-          <h4 className="mb-1 fw-bold">Daftar Kelas</h4>
-          <p className="text-muted mb-0 small">Gabung kelas atau buat kelas untuk kelompokmu.</p>
+          <h4 className="mb-1 fw-bold text-dark" style={{ letterSpacing: '-0.3px' }}>Daftar Kelas</h4>
+          <p className="text-secondary mb-0 small fw-medium">Gabung kelas atau buat kelas untuk kelompokmu.</p>
         </div>
         <div className="d-flex gap-2">
-          <button className="btn btn-outline-primary btn-sm rounded-pill px-3" onClick={() => setShowJoinModal(true)}>
+          <button className="btn btn-outline-primary shadow-sm btn-sm rounded-pill px-3 fw-bold" onClick={() => setShowJoinModal(true)}>
             <i className="bi bi-box-arrow-in-right me-2"></i>Gabung
           </button>
-          <button className="btn btn-primary btn-sm rounded-pill px-3" onClick={() => setShowCreateModal(true)}>
+          <button className="btn btn-primary shadow-sm btn-sm rounded-pill px-3 fw-bold d-flex align-items-center" onClick={() => setShowCreateModal(true)} style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', border: 'none' }}>
             <i className="bi bi-plus-lg me-2"></i>Buat Kelas
           </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="text-center py-5 text-muted">
-          <div className="spinner-border spinner-border-sm mb-2" role="status"></div>
+        <div className="text-center py-5 text-secondary fw-medium">
+          <div className="spinner-border spinner-border-sm mb-2 text-primary" role="status"></div>
           <div>Memuat daftar kelas...</div>
         </div>
       ) : kelasList.length === 0 ? (
         <div className="text-center py-5">
-          <i className="bi bi-people d-block mb-3 text-muted" style={{ fontSize: '3rem' }}></i>
-          <h5 className="text-muted">Kamu belum bergabung di kelas apapun.</h5>
-          <p className="text-muted small">Buat kelas baru sebagai komisaris atau gabung dengan kode undangan.</p>
-          <button className="btn btn-primary mt-3 rounded-pill px-4" onClick={() => setShowJoinModal(true)}>
-            Gabung Sekarang
+          <i className="bi bi-people-fill d-block mb-3 text-secondary opacity-50" style={{ fontSize: '3rem' }}></i>
+          <h5 className="fw-bold text-dark">Kamu belum bergabung di kelas apapun.</h5>
+          <p className="text-secondary small fw-medium">Buat kelas baru sebagai komisaris atau gabung dengan kode undangan.</p>
+          <button className="btn btn-primary mt-3 rounded-pill px-4 fw-bold shadow-sm" onClick={() => setShowJoinModal(true)} style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none' }}>
+            <i className="bi bi-rocket-takeoff-fill me-2"></i> Gabung Sekarang
           </button>
         </div>
       ) : (
@@ -126,21 +126,21 @@ export default function KelasIndex() {
           {kelasList.map(k => (
             <div key={k.id} className="col-12 col-md-6 col-lg-4">
               <Link href={`/kelas/${k.id}`} className="text-decoration-none">
-                <div className="card h-100 border-0 shadow-sm" style={{ transition: 'transform 0.2s', borderRadius: '16px', border: '1px solid var(--sh-border)' }}>
-                  <div className="card-body">
+                <div className="card h-100 border-0 shadow-sm" style={{ transition: 'transform 0.2s, box-shadow 0.2s', borderRadius: '20px', backgroundColor: 'var(--sh-card-bg)', border: '1px solid rgba(0,0,0,0.05)' }} onMouseOver={(e: any) => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }} onMouseOut={(e: any) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'var(--bs-box-shadow-sm)' }}>
+                  <div className="card-body p-4">
                     <div className="d-flex justify-content-between align-items-start mb-2">
-                      <h5 className="card-title text-truncate fw-bold mb-0 text-dark" style={{ maxWidth: '75%' }}>{k.name}</h5>
-                      <span className={`badge ${k.role === 'ADMIN' ? 'bg-primary' : 'bg-secondary'}`}>
+                      <h5 className="card-title text-truncate fw-bold mb-0 text-dark" style={{ maxWidth: '75%', fontSize: '1.1rem' }}>{k.name}</h5>
+                      <span className={`badge ${k.role === 'ADMIN' ? 'bg-primary' : 'bg-light text-secondary border'} rounded-pill`} style={{ fontSize: '0.65rem', padding: '5px 10px' }}>
                         {k.role === 'ADMIN' ? 'Komisaris' : 'Anggota'}
                       </span>
                     </div>
-                    <div className="text-muted small mb-3 text-truncate">{k.subject ? k.subject : 'Umum'}</div>
-                    <p className="card-text text-muted small" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {k.description || 'Tidak ada deskripsi.'}
+                    <div className="text-primary small fw-bold mb-3 d-flex align-items-center gap-1"><i className="bi bi-book-half"></i> {k.subject ? k.subject : 'Mata Kuliah Umum'}</div>
+                    <p className="card-text text-secondary small fw-medium" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.6' }}>
+                      {k.description || 'Deskripsi kelas belum ditambahkan oleh komisaris.'}
                     </p>
-                    <div className="d-flex gap-3 small text-muted mt-auto pt-3 border-top">
-                      <div title="Anggota"><i className="bi bi-person me-1"></i>{k.memberCount}</div>
-                      <div title="Tugas"><i className="bi bi-journal-check me-1"></i>{k.taskCount}</div>
+                    <div className="d-flex gap-3 small mt-auto pt-3 border-top" style={{ color: '#475569', fontWeight: 600 }}>
+                      <div className="d-flex align-items-center gap-1 px-2 py-1 bg-light rounded-pill"><i className="bi bi-people-fill text-primary"></i>{k.memberCount}</div>
+                      <div className="d-flex align-items-center gap-1 px-2 py-1 bg-light rounded-pill"><i className="bi bi-journal-bookmark-fill text-warning"></i>{k.taskCount}</div>
                     </div>
                   </div>
                 </div>

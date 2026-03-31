@@ -105,74 +105,75 @@ export default function ClassDetailPage() {
 
   return (
     <div className="class-detail pb-5">
-      <div className="d-flex justify-content-between align-items-start mb-4">
+      <div className="d-flex justify-content-between align-items-start mb-4 bg-white p-4 rounded-4 shadow-sm border" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
         <div>
-          <Link href="/kelas" className="btn btn-link px-0 text-decoration-none text-muted small"><i className="bi bi-arrow-left me-1"></i>Kembali</Link>
-          <h3 className="fw-bold mb-1 mt-2">{data.name}</h3>
-          <p className="text-muted small mb-2">{data.description || 'Tidak ada deskripsi'}</p>
-          <div className="d-flex gap-2">
-            <span className="badge bg-light text-dark border"><i className="bi bi-key me-1"></i>Kode: {data.inviteCode}</span>
-            <span className={`badge ${data.myRole === 'ADMIN' ? 'bg-primary' : 'bg-secondary'}`}>
+          <Link href="/kelas" className="btn btn-link px-0 text-decoration-none text-secondary small fw-medium mb-2 d-inline-block"><i className="bi bi-arrow-left me-1"></i>Kembali ke Daftar</Link>
+          <h3 className="fw-bold mb-1 mt-1 text-dark" style={{ letterSpacing: '-0.5px' }}>{data.name}</h3>
+          <p className="text-secondary small fw-medium mb-3">{data.description || 'Tidak ada deskripsi'}</p>
+          <div className="d-flex flex-wrap gap-2 mt-2">
+            <span className="badge bg-light text-dark border px-3 py-2 rounded-pill fw-semibold"><i className="bi bi-key-fill text-warning me-2"></i>Kode: <span className="user-select-all font-monospace">{data.inviteCode}</span></span>
+            <span className={`badge ${data.myRole === 'ADMIN' ? 'bg-primary' : 'bg-secondary'} px-3 py-2 rounded-pill fw-bold`}>
+              <i className={`bi ${data.myRole === 'ADMIN' ? 'bi-shield-check' : 'bi-person'} me-1`}></i>
               {data.myRole === 'ADMIN' ? 'Komisaris' : 'Anggota'}
             </span>
           </div>
         </div>
-        <div className="d-flex flex-column gap-2 text-end">
+        <div className="d-flex flex-column gap-2 text-end mt-4 mt-md-0">
           {data.myRole === 'ADMIN' && (
-            <button className="btn btn-outline-primary btn-sm rounded-pill px-3" onClick={() => setShowAnnounce(true)}>
-              <i className="bi bi-megaphone me-1"></i>Broadcast
+            <button className="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm" onClick={() => setShowAnnounce(true)}>
+              <i className="bi bi-megaphone-fill me-2"></i>Broadcast Info
             </button>
           )}
-          <button className="btn btn-outline-danger btn-sm rounded-pill px-3" onClick={handleLeaveClass}>
-            <i className={`bi ${data.myRole === 'ADMIN' ? 'bi-trash' : 'bi-box-arrow-right'} me-1`}></i>
-            {data.myRole === 'ADMIN' ? 'Hapus Kelas' : 'Keluar'}
+          <button className="btn btn-outline-danger btn-sm rounded-pill px-4 fw-bold" onClick={handleLeaveClass}>
+            <i className={`bi ${data.myRole === 'ADMIN' ? 'bi-trash-fill' : 'bi-box-arrow-right'} me-2`}></i>
+            {data.myRole === 'ADMIN' ? 'Hapus Kelas' : 'Keluar Kelas'}
           </button>
         </div>
       </div>
 
-      <ul className="nav nav-tabs mb-4">
+      <ul className="nav nav-pills mb-4 gap-2 border-bottom pb-3">
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'tasks' ? 'active fw-bold' : 'text-muted'}`} onClick={() => setActiveTab('tasks')}>
-            <i className="bi bi-list-task me-1"></i>Tugas ({data.tasks.length})
+          <button className={`nav-link rounded-pill px-4 fw-bold ${activeTab === 'tasks' ? 'active shadow-sm' : 'text-secondary bg-light'}`} onClick={() => setActiveTab('tasks')}>
+            <i className="bi bi-list-task me-2"></i>Tugas <span className="badge bg-white text-primary ms-1 rounded-pill">{data.tasks.length}</span>
           </button>
         </li>
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'schedule' ? 'active fw-bold' : 'text-muted'}`} onClick={() => setActiveTab('schedule')}>
-            <i className="bi bi-calendar3 me-1"></i>Jadwal
+          <button className={`nav-link rounded-pill px-4 fw-bold ${activeTab === 'schedule' ? 'active shadow-sm' : 'text-secondary bg-light'}`} onClick={() => setActiveTab('schedule')}>
+            <i className="bi bi-calendar3 me-2"></i>Jadwal
           </button>
         </li>
         <li className="nav-item">
-          <button className={`nav-link ${activeTab === 'members' ? 'active fw-bold' : 'text-muted'}`} onClick={() => setActiveTab('members')}>
-            <i className="bi bi-people me-1"></i>Anggota ({data.members.length})
+          <button className={`nav-link rounded-pill px-4 fw-bold ${activeTab === 'members' ? 'active shadow-sm' : 'text-secondary bg-light'}`} onClick={() => setActiveTab('members')}>
+            <i className="bi bi-people-fill me-2"></i>Anggota <span className="badge bg-white text-primary ms-1 rounded-pill">{data.members.length}</span>
           </button>
         </li>
       </ul>
 
       {activeTab === 'tasks' && (
-        <div>
+        <div className="animation-fade-in">
           {data.myRole === 'ADMIN' && (
-            <div className="mb-3 text-end">
-              <button className="btn btn-primary btn-sm rounded-pill px-3" onClick={() => { setTaskId(''); setTaskTitle(''); setTaskDesc(''); setTaskDeadline(''); setTaskPriority('MEDIUM'); setShowTaskModal(true); }}>
-                <i className="bi bi-plus-lg me-1"></i>Tambah Tugas
+            <div className="mb-3 d-flex justify-content-end">
+              <button className="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm" onClick={() => { setTaskId(''); setTaskTitle(''); setTaskDesc(''); setTaskDeadline(''); setTaskPriority('MEDIUM'); setShowTaskModal(true); }}>
+                <i className="bi bi-plus-lg me-2"></i>Tambah Tugas Kelas
               </button>
             </div>
           )}
-          {data.tasks.length === 0 ? <p className="text-muted text-center py-4">Belum ada tugas kelas.</p> : (
-            <div className="list-group">
+          {data.tasks.length === 0 ? <div className="text-secondary text-center py-5 bg-light rounded-4 border-dashed mt-3"><i className="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>Belum ada tugas kelas.</div> : (
+            <div className="list-group gap-2">
               {data.tasks.map(t => (
-                <div key={t.id} className="list-group-item list-group-item-action d-flex justify-content-between align-items-start p-3 rounded-3 mb-2 border">
+                <div key={t.id} className="list-group-item d-flex justify-content-between align-items-start p-4 rounded-4 border-0 shadow-sm" style={{ background: 'var(--sh-card-bg)' }}>
                   <div>
-                    <h6 className="mb-1 fw-bold">{t.title}</h6>
-                    <p className="mb-1 small text-muted">{t.description}</p>
-                    <div className="small text-muted d-flex gap-2 mt-2">
-                      <span className="badge bg-light text-dark"><i className="bi bi-calendar-event me-1"></i>{t.deadline ? new Date(t.deadline).toLocaleDateString('id-ID') : 'Tidak ada deadline'}</span>
-                      <span className={`badge ${t.priority === 'HIGH' ? 'bg-danger' : t.priority === 'MEDIUM' ? 'bg-warning text-dark' : 'bg-success'}`}>Prioritas: {t.priority}</span>
+                    <h6 className="mb-1 fw-bold text-dark fs-5">{t.title}</h6>
+                    <p className="mb-2 small text-secondary fw-medium lh-lg">{t.description}</p>
+                    <div className="small d-flex flex-wrap gap-2 mt-3">
+                      <span className="badge bg-light text-dark border px-3 py-2 rounded-pill"><i className="bi bi-calendar-event text-primary me-2"></i>{t.deadline ? new Date(t.deadline).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Tidak ada batas waktu'}</span>
+                      <span className={`badge px-3 py-2 rounded-pill ${t.priority === 'HIGH' ? 'bg-danger text-white' : t.priority === 'MEDIUM' ? 'bg-warning text-dark' : 'bg-success text-white'}`}><i className="bi bi-flag-fill me-1"></i> Prio: {t.priority}</span>
                     </div>
                   </div>
                   {data.myRole === 'ADMIN' && (
-                    <div className="d-flex gap-2">
-                      <button className="btn btn-sm btn-light text-primary py-0 px-2" onClick={() => { setTaskId(t.id); setTaskTitle(t.title); setTaskDesc(t.description || ''); setTaskDeadline(t.deadline ? t.deadline.slice(0, 16) : ''); setTaskPriority(t.priority); setShowTaskModal(true); }}>Edit</button>
-                      <button className="btn btn-sm btn-light text-danger py-0 px-2" onClick={() => handleDeleteTask(t.id)}>Hapus</button>
+                    <div className="d-flex flex-column gap-2 ms-3">
+                      <button className="btn btn-sm btn-light text-primary py-1 px-3 fw-bold rounded-pill" onClick={() => { setTaskId(t.id); setTaskTitle(t.title); setTaskDesc(t.description || ''); setTaskDeadline(t.deadline ? t.deadline.slice(0, 16) : ''); setTaskPriority(t.priority); setShowTaskModal(true); }}>Edit</button>
+                      <button className="btn btn-sm btn-light text-danger py-1 px-3 fw-bold rounded-pill" onClick={() => handleDeleteTask(t.id)}>Hapus</button>
                     </div>
                   )}
                 </div>
@@ -183,27 +184,31 @@ export default function ClassDetailPage() {
       )}
 
       {activeTab === 'schedule' && (
-        <div>
+        <div className="animation-fade-in">
           {data.myRole === 'ADMIN' && (
-            <div className="alert alert-info py-2 px-3 small border-0 bg-opacity-10 text-primary d-flex justify-content-between align-items-center">
-              <span>Untuk mengubah jadwal mingguan kelas, <Link href="/calendar">buka halaman Kalender</Link> dan klik &quot;Tambah Jadwal&quot;. Sinkronisasi jadwal kelas sudah tertanam disana.</span>
+            <div className="alert alert-primary py-3 px-4 rounded-4 shadow-sm border-0 d-flex gap-3 align-items-center mb-4">
+              <i className="bi bi-info-circle-fill fs-3 text-primary"></i>
+              <div>
+                <strong>Pengaturan Jadwal Sinkronisasi Mingguan</strong><br/>
+                <span className="small">Untuk menambah, menghapus, atau mengubah hari jadwal kelas ini, silakan ke <Link href="/calendar" className="fw-bold text-decoration-none">halaman Kalender</Link> dan klik tombol "Tambah Jadwal".</span>
+              </div>
             </div>
           )}
-          {data.schedule.length === 0 ? <p className="text-muted text-center py-4">Belum ada jadwal mingguan.</p> : (
-            <div className="row g-2">
+          {data.schedule.length === 0 ? <div className="text-secondary text-center py-5 bg-light rounded-4 border-dashed mt-3"><i className="bi bi-calendar-x fs-1 d-block mb-2 opacity-50"></i>Belum ada jadwal mingguan kelas.</div> : (
+            <div className="row g-3">
               {data.schedule.map(s => {
                 const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
                 return (
-                  <div key={s.id} className="col-12 col-md-6">
-                    <div className="card border-0 shadow-sm mb-2">
-                      <div className="card-body py-2 px-3 d-flex justify-content-between align-items-center">
-                        <div>
-                          <div className="fw-bold small">{days[s.dayOfWeek]}</div>
-                          <div className="text-dark fw-semibold">{s.title}</div>
+                  <div key={s.id} className="col-12 col-md-6 col-lg-4">
+                    <div className="card border-0 shadow-sm h-100 rounded-4" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(37, 99, 235, 0.02) 100%)' }}>
+                      <div className="card-body p-4 d-flex flex-column">
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                          <span className="badge bg-primary rounded-pill px-3 py-2 fw-bold"><i className="bi bi-calendar-day-fill me-2"></i>{days[s.dayOfWeek]}</span>
                         </div>
-                        <div className="text-end small text-muted">
-                          <div>{s.startTime} - {s.endTime}</div>
-                          <div>{s.place}</div>
+                        <h5 className="text-dark fw-bold mb-3">{s.title}</h5>
+                        <div className="mt-auto small text-secondary fw-semibold bg-white p-3 rounded-3 shadow-sm">
+                          <div className="d-flex align-items-center gap-2 mb-2"><i className="bi bi-clock-history text-warning fs-6"></i> {s.startTime} - {s.endTime}</div>
+                          <div className="d-flex align-items-center gap-2 m-0"><i className="bi bi-geo-alt-fill text-danger fs-6"></i> {s.place || 'Ruangan belum diatur'}</div>
                         </div>
                       </div>
                     </div>
@@ -216,17 +221,18 @@ export default function ClassDetailPage() {
       )}
 
       {activeTab === 'members' && (
-        <div className="list-group list-group-flush border rounded-3 overflow-hidden">
+        <div className="list-group gap-2 animation-fade-in">
           {data.members.map(m => (
-            <div key={m.id} className="list-group-item d-flex align-items-center p-3">
-              <div className="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-3" style={{ width: 40, height: 40, fontSize: '1rem', fontWeight: 'bold', backgroundImage: m.image ? `url(${m.image})` : 'none', backgroundSize: 'cover' }}>
+            <div key={m.id} className="list-group-item d-flex align-items-center p-3 rounded-4 shadow-sm border-0" style={{ background: 'var(--sh-card-bg)' }}>
+              <div className="rounded-circle bg-primary bg-gradient text-white d-flex align-items-center justify-content-center me-3 shadow-sm border" style={{ width: 48, height: 48, fontSize: '1.2rem', fontWeight: 'bold', backgroundImage: m.image ? `url(${m.image})` : 'none', backgroundSize: 'cover' }}>
                 {!m.image && m.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-grow-1">
-                <div className="fw-bold">{m.name} {m.id === data.id && '(Kamu)'}</div>
-                <div className="small text-muted">{m.email}</div>
+                <div className="fw-bold text-dark fs-6">{m.name} {m.id === data.id && <span className="text-primary ms-1">(Kamu)</span>}</div>
+                <div className="small text-secondary fw-medium">{m.email}</div>
               </div>
-              <span className={`badge ${m.role === 'ADMIN' ? 'bg-primary' : 'bg-light text-muted border'} rounded-pill px-3`}>
+              <span className={`badge ${m.role === 'ADMIN' ? 'bg-primary' : 'bg-light text-secondary border'} rounded-pill px-4 py-2 mt-2 mt-sm-0`}>
+                <i className={`bi ${m.role === 'ADMIN' ? 'bi-star-fill text-warning' : 'bi-person-fill'} me-2`}></i>
                 {m.role === 'ADMIN' ? 'Komisaris' : 'Anggota'}
               </span>
             </div>

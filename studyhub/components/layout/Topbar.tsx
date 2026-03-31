@@ -298,27 +298,31 @@ export default function Topbar() {
           >
             <i className="bi bi-bell" style={{ fontSize: 17 }}></i>
             {unreadCount > 0 && (
-              <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style={{ fontSize: 10 }}>
+              <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill border border-2 border-white" style={{ fontSize: 10, background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </button>
           {showNotifs && (
-            <div className="dropdown-menu dropdown-menu-end show shadow-sm" style={{ position: 'absolute', top: '100%', right: 0, width: 320, padding: 0, marginTop: '10px', maxHeight: '400px', overflowY: 'auto' }}>
-              <div className="p-3 border-bottom bg-light">
-                <h6 className="mb-0 fw-bold">Notifikasi</h6>
+            <div className="dropdown-menu dropdown-menu-end show shadow-lg border-0" style={{ position: 'absolute', top: '100%', right: 0, width: 340, padding: 0, marginTop: '12px', maxHeight: '420px', overflowY: 'auto', borderRadius: '16px', backdropFilter: 'blur(12px)', background: 'var(--sh-card-bg)', zIndex: 1050 }}>
+              <div className="p-3 border-bottom d-flex justify-content-between align-items-center" style={{ background: 'rgba(59, 130, 246, 0.05)' }}>
+                <h6 className="mb-0 fw-bold d-flex align-items-center gap-2"><i className="bi bi-bell-fill text-primary"></i> Notifikasi</h6>
+                <button className="btn btn-sm btn-light py-0 px-2 rounded-pill" style={{ fontSize: '11px' }} onClick={() => setShowNotifs(false)}>Tutup</button>
               </div>
               {notifications.length === 0 ? (
-                <div className="p-4 text-center text-muted small">Belum ada aktivitas baru.</div>
+                <div className="p-5 text-center text-secondary small">
+                  <i className="bi bi-inbox-fill text-light d-block mb-3" style={{ fontSize: '3rem' }}></i>
+                  Belum ada aktivitas baru.
+                </div>
               ) : (
                 <div className="list-group list-group-flush">
                   {notifications.map((n) => (
-                    <div key={n.id} className={`list-group-item list-group-item-action p-3 ${n.isRead ? '' : 'bg-light'}`} onClick={() => { setShowNotifs(false); if (n.link) router.push(n.link); }} style={{ cursor: 'pointer' }}>
-                      <div className="d-flex w-100 justify-content-between mb-1">
-                        <strong className="small text-truncate me-2">{n.title}</strong>
-                        <small className="text-muted" style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>{timeAgo(n.createdAt)}</small>
+                    <div key={n.id} className={`list-group-item list-group-item-action p-3 border-bottom-0 border-top ${n.isRead ? '' : 'bg-primary bg-opacity-10'}`} onClick={() => { setShowNotifs(false); if (n.link) router.push(n.link); }} style={{ cursor: 'pointer', transition: 'background 0.2s ease' }}>
+                      <div className="d-flex w-100 justify-content-between mb-1 align-items-center">
+                        <strong className="small text-truncate me-2 fw-bold text-dark">{n.title}</strong>
+                        <span className="badge bg-light text-secondary rounded-pill" style={{ fontSize: '10px', fontWeight: 600 }}>{timeAgo(n.createdAt)}</span>
                       </div>
-                      <p className="mb-0 small text-muted lh-sm">{n.message}</p>
+                      <p className="mb-0 small text-secondary lh-sm" style={{ fontSize: '12px' }}>{n.message}</p>
                     </div>
                   ))}
                 </div>
@@ -326,9 +330,32 @@ export default function Topbar() {
             </div>
           )}
         </div>
-        <Link href="/profile" className="topbar-avatar" title="Profil">
-          <i className="bi bi-person-circle"></i>
-        </Link>
+        
+        <div className="dropdown">
+          <button 
+            className="topbar-avatar border-0 p-0 shadow-sm" 
+            title="Profil & Preferensi" 
+            data-bs-toggle="dropdown" 
+            aria-expanded="false"
+            style={{ 
+              width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #0ea5e9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white'
+            }}
+          >
+            <i className="bi bi-person-fill" style={{ fontSize: '18px' }}></i>
+          </button>
+          <ul className="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-2" style={{ borderRadius: '16px', minWidth: '220px', zIndex: 1050 }}>
+            <li className="px-3 py-2 mb-1">
+              <div className="fw-bold" style={{ fontSize: '14px', color: 'var(--sh-text)' }}>Akun Saya</div>
+              <div className="text-secondary text-truncate" style={{ fontSize: '12px' }}>Pengguna StudyHub</div>
+            </li>
+            <li><hr className="dropdown-divider mb-1 mt-0" /></li>
+            <li><Link href="/profile" className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px' }}><i className="bi bi-person-circle me-2 text-primary"></i>Profil Utama</Link></li>
+            <li><button className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px' }} onClick={toggleTheme}><i className={`bi ${isDark ? 'bi-sun-fill text-warning' : 'bi-moon-stars-fill text-dark'} me-2`}></i>{isDark ? 'Mode Terang' : 'Mode Gelap'}</button></li>
+            <li><Link href="/profile" className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px' }}><i className="bi bi-gear-fill me-2 text-secondary"></i>Preferensi</Link></li>
+            <li><hr className="dropdown-divider my-1" /></li>
+            <li><Link href="/auth/login" className="dropdown-item py-2 fw-semibold rounded-3 text-danger" style={{ fontSize: '13px' }} onClick={() => fetch('/api/auth/signout', {method:'POST'})}><i className="bi bi-box-arrow-right me-2"></i>Keluar</Link></li>
+          </ul>
+        </div>
       </div>
     </header>
   )

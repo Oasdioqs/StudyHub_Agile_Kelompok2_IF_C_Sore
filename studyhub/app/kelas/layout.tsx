@@ -1,7 +1,14 @@
+import Sidebar from '@/components/layout/Sidebar'
+import TopbarShell from '@/components/layout/TopbarShell'
+
 export default function KelasLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="container-fluid py-3">
-      {children}
+    <div>
+      <Sidebar />
+      <div className="app-main">
+        <TopbarShell />
+        <main className="p-4 page-transition">{children}</main>
+      </div>
     </div>
   )
 }

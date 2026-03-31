@@ -9,8 +9,8 @@
   --sh-bg: #f8fafc;
   --sh-sidebar-width: 260px;
   --sh-card-bg: #ffffff;
-  --sh-text: #1e293b;
-  --sh-muted: #64748b;
+  --sh-text: #0f172a;
+  --sh-muted: #334155;
   --sh-border: #e2e8f0;
   --sh-topbar-bg: linear-gradient(120deg, rgba(255,255,255,0.95), rgba(248,250,252,0.96));
 }
@@ -18,8 +18,8 @@
 :root[data-theme='dark'] {
   --sh-bg: #0b1220;
   --sh-card-bg: #111827;
-  --sh-text: #e5e7eb;
-  --sh-muted: #94a3b8;
+  --sh-text: #f8fafc;
+  --sh-muted: #cbd5e1;
   --sh-border: #1f2937;
   --sh-topbar-bg: linear-gradient(120deg, rgba(17,24,39,0.94), rgba(15,23,42,0.94));
 }
@@ -53,6 +53,16 @@ body {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   overflow-x: hidden;
+}
+
+/* Global class modifier untuk menggantikan text-muted Bootstrap yang terlalu pudar */
+.text-muted {
+  color: var(--sh-muted) !important;
+  font-weight: 500;
+}
+.text-secondary {
+  color: var(--sh-muted) !important;
+  font-weight: 500;
 }
 
 .app-sidebar {
