@@ -25,7 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     where: { groupId: params.id, NOT: { userId: session.user.id } },
   })
 
-  // Simpan ke tabel ClassAnnouncement (bisa dibaca semua anggota di tab Pengumuman)
+  // Simpan ke tabel ClassAnnouncement
   const announcement = await db.classAnnouncement.create({
     data: {
       groupId: params.id,
@@ -35,11 +35,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     },
   })
 
-  // Kirim notif ke semua anggota (kecuali pengirim)
-  if (members.length > 0) {
-    const memberIds = members.map((m) => m.userId)
+  const memberIds = members.map((m) => m.userId)
 
-    // 1. Notifikasi database (in-app)
+  // 1. Notifikasi in-app untuk semua anggota
+  if (memberIds.length > 0) {
     await db.notification.createMany({
       data: memberIds.map((userId) => ({
         userId,
@@ -49,8 +48,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         link: `/kelas/${params.id}?tab=announcements`,
       })),
     })
+  }
 
-    // 2. FCM push notification (real-time)
+  // 2. Notifikasi konfirmasi untuk komisaris sendiri
+  await db.notification.create({
+    data: {
+      userId: session.user.id,
+      type: 'CLASS_ANNOUNCEMENT',
+      title: `✅ Pengumuman terkirim ke ${memberIds.length} anggota — ${group?.name}`,
+      message: `"${title.trim()}" berhasil dikirim.`,
+      link: `/kelas/${params.id}?tab=announcements`,
+    },
+  })
+
+  // 3. FCM push notification ke semua anggota
+  if (memberIds.length > 0) {
     try {
       const fcmTokens = await db.fcmToken.findMany({
         where: { userId: { in: memberIds } },
@@ -65,10 +77,34 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         })
       }
     } catch (err) {
-      // Jangan gagalkan request jika FCM bermasalah
       console.error('[FCM] Announce push error:', err)
     }
   }
 
-  return NextResponse.json({ ok: true, sent: members.length, announcement })
+  return NextResponse.json({ ok: true, sent: memberIds.length, announcement })
+}
+
+// DELETE: komisaris hapus pengumuman
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const admin = await db.groupMember.findFirst({
+    where: { userId: session.user.id, groupId: params.id, role: 'ADMIN' },
+  })
+  if (!admin) return NextResponse.json({ error: 'Hanya komisaris yang dapat menghapus pengumuman' }, { status: 403 })
+
+  const { searchParams } = new URL(req.url)
+  const announcementId = searchParams.get('announcementId')
+  if (!announcementId) return NextResponse.json({ error: 'announcementId diperlukan' }, { status: 400 })
+
+  // Pastikan pengumuman milik kelas ini
+  const ann = await db.classAnnouncement.findFirst({
+    where: { id: announcementId, groupId: params.id },
+  })
+  if (!ann) return NextResponse.json({ error: 'Pengumuman tidak ditemukan' }, { status: 404 })
+
+  await db.classAnnouncement.delete({ where: { id: announcementId } })
+
+  return NextResponse.json({ ok: true })
 }

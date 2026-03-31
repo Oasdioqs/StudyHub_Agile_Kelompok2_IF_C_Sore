@@ -303,6 +303,16 @@ export default function ClassDetailPage() {
     }
   }
 
+  const handleDeleteAnnouncement = async (annId: string) => {
+    if (!confirm('Hapus pengumuman ini?')) return
+    try {
+      const res = await fetch(`/api/kelas/${id}/announce?announcementId=${annId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setAnnouncements((prev) => prev.filter((a) => a.id !== annId))
+      }
+    } catch { /* ignore */ }
+  }
+
   const handleToggleMode = async (slotId: string | 'all', currentMode: SyncMode) => {
     setUpdatingMode(slotId)
     setLoadingMode(true)
@@ -570,6 +580,15 @@ export default function ClassDetailPage() {
                       <span className="cd-ann-time">
                         {new Date(ann.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
+                      {data.myRole === 'ADMIN' && (
+                        <button
+                          className="cd-ann-del-btn"
+                          title="Hapus pengumuman"
+                          onClick={() => handleDeleteAnnouncement(ann.id)}
+                        >
+                          <i className="bi bi-trash3" />
+                        </button>
+                      )}
                     </div>
                     <div className="cd-ann-title">{ann.title}</div>
                     <p className="cd-ann-msg">{ann.message}</p>
@@ -1244,6 +1263,15 @@ export default function ClassDetailPage() {
         .cd-ann-time { font-size: 0.75rem; color: var(--sh-muted); }
         .cd-ann-title { font-size: 0.95rem; font-weight: 800; color: var(--sh-text); margin-bottom: 4px; }
         .cd-ann-msg { font-size: 0.84rem; color: var(--sh-muted); margin: 0; line-height: 1.65; white-space: pre-wrap; }
+        .cd-ann-del-btn {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 22px; height: 22px; border-radius: 6px; border: none;
+          background: transparent; color: #ef4444; font-size: 0.75rem;
+          cursor: pointer; opacity: 0; transition: all 0.15s ease;
+          margin-left: 2px; flex-shrink: 0;
+        }
+        .cd-ann-card:hover .cd-ann-del-btn { opacity: 1; }
+        .cd-ann-del-btn:hover { background: #fee2e2; }
 
         /* ── Schedule ────────────────────────────────────── */
 

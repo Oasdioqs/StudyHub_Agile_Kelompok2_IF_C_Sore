@@ -67,15 +67,21 @@ export default function Topbar() {
   }
 
   useEffect(() => {
-    fetch('/api/notifications')
-      .then(res => res.json())
-      .then(data => {
-        if (data.notifications) {
-          setNotifications(data.notifications)
-          setUnreadCount(data.unreadCount || 0)
-        }
-      })
-      .catch(() => {})
+    const fetchNotifs = () => {
+      fetch('/api/notifications')
+        .then(res => res.json())
+        .then(data => {
+          if (data.notifications) {
+            setNotifications(data.notifications)
+            setUnreadCount(data.unreadCount || 0)
+          }
+        })
+        .catch(() => {})
+    }
+    fetchNotifs()
+    // Poll setiap 30 detik agar pengumuman & notif baru langsung muncul
+    const interval = setInterval(fetchNotifs, 30000)
+    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
