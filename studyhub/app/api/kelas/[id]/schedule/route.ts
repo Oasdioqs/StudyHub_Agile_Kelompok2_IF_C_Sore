@@ -135,26 +135,32 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     })
 
-    const modeMap: Record<string, string> = {}
-    for (const slot of targetSlots) {
-      modeMap[slot.id] = modeValue
-    }
-
-    // Get live meeting URLs from note field
-    const weekStart2 = new Date(weekStartMs)
-    const sessionModes = await db.classSessionMode.findMany({
-      where: { slotId: { in: updatedSchedule.map((s) => s.id) }, slotType: 'class', date: weekStart2 },
+    // Ambil SEMUA session modes dari DB (bukan hanya targetSlots) — agar slot lain tidak ter-reset
+    const allSessionModes = await db.classSessionMode.findMany({
+      where: {
+        slotId: { in: updatedSchedule.map((s) => s.id) },
+        slotType: 'class',
+        date: weekStart,
+      },
     })
-    const noteMap: Record<string, string | null> = {}
-    for (const sm of sessionModes) {
-      noteMap[sm.slotId] = sm.note
+
+    // Mulai dengan nilai DB aktual, lalu override dengan perubahan baru
+    const finalModeMap: Record<string, string> = {}
+    const finalNoteMap: Record<string, string | null> = {}
+    for (const sm of allSessionModes) {
+      finalModeMap[sm.slotId] = sm.mode
+      finalNoteMap[sm.slotId] = sm.note
+    }
+    // Override dengan nilai yang baru saja di-set
+    for (const slot of targetSlots) {
+      finalModeMap[slot.id] = modeValue
     }
 
     return NextResponse.json(
       updatedSchedule.map((s) => ({
         ...s,
-        syncMode: modeMap[s.id] || 'LANGSUNG',
-        liveMeetingUrl: noteMap[s.id] || null,
+        syncMode: finalModeMap[s.id] || 'LANGSUNG',
+        liveMeetingUrl: finalNoteMap[s.id] || null,
       }))
     )
   }

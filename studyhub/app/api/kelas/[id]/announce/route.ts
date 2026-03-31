@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { sendPushToTokens } from '@/lib/firebase-admin'
 
 // POST: komisaris kirim pengumuman ke semua anggota
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -36,15 +37,37 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Kirim notif ke semua anggota (kecuali pengirim)
   if (members.length > 0) {
+    const memberIds = members.map((m) => m.userId)
+
+    // 1. Notifikasi database (in-app)
     await db.notification.createMany({
-      data: members.map((m) => ({
-        userId: m.userId,
+      data: memberIds.map((userId) => ({
+        userId,
         type: 'CLASS_ANNOUNCEMENT',
         title: `📢 ${title.trim()} — ${group?.name}`,
         message: message.trim(),
         link: `/kelas/${params.id}?tab=announcements`,
       })),
     })
+
+    // 2. FCM push notification (real-time)
+    try {
+      const fcmTokens = await db.fcmToken.findMany({
+        where: { userId: { in: memberIds } },
+        select: { token: true },
+      })
+      const tokens = fcmTokens.map((t) => t.token)
+      if (tokens.length > 0) {
+        await sendPushToTokens(tokens, {
+          title: `📢 ${title.trim()} — ${group?.name}`,
+          body: message.trim().length > 100 ? message.trim().slice(0, 97) + '…' : message.trim(),
+          url: `/kelas/${params.id}?tab=announcements`,
+        })
+      }
+    } catch (err) {
+      // Jangan gagalkan request jika FCM bermasalah
+      console.error('[FCM] Announce push error:', err)
+    }
   }
 
   return NextResponse.json({ ok: true, sent: members.length, announcement })

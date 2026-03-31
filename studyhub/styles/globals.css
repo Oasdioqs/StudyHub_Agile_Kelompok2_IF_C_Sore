@@ -605,6 +605,31 @@ body {
   box-shadow: 0 4px 15px rgba(0,0,0,0.5);
 }
 
+/* ── PWA / Home Screen: safe area lebih besar ── */
+@media (display-mode: standalone) {
+  .mobile-bottom-nav {
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+  .app-main {
+    padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important;
+  }
+  .mobile-fab-btn {
+    transform: translateY(-28px);
+  }
+  .mobile-fab-btn.open {
+    transform: translateY(-28px) rotate(45deg);
+  }
+}
+
+/* iOS standalone (webkit) */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) {
+    .mobile-bottom-nav {
+      padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    }
+  }
+}
+
 @media (max-width: 400px) {
   .topbar-right .btn .bi.me-1 {
     margin-right: 0 !important;
