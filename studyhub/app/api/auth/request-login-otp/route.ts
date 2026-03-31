@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import { Resend } from 'resend'
+import { sendEmail, resendVerificationEmail } from '@/lib/mail'
 import { db } from '@/lib/db'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
@@ -17,70 +17,6 @@ function generateOtp() {
 
 function sha256(input: string) {
   return crypto.createHash('sha256').update(input).digest('hex')
-}
-
-async function resendVerificationEmail(email: string) {
-  const token = crypto.randomBytes(32).toString('hex')
-  const expires = new Date(Date.now() + 1000 * 60 * 60 * 24)
-
-  await db.verificationToken.create({
-    data: {
-      identifier: email,
-      token,
-      expires,
-    },
-  })
-
-  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-  const verifyUrl = `${baseUrl}/auth/verify-email?token=${token}`
-
-  const from = process.env.EMAIL_FROM || 'StudyHub <onboarding@resend.dev>'
-  const resend = new Resend(process.env.RESEND_API_KEY!)
-  const result = await resend.emails.send({
-    from,
-    to: email,
-    subject: 'Confirm Email - StudyHub',
-    html: `
-      <!doctype html>
-      <html>
-        <body style="margin:0; padding:0; background:#f6f7fb;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;">
-            <tr>
-              <td align="center" style="padding:32px 16px;">
-                <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%; max-width:600px; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(17,24,39,0.08);">
-                  <tr>
-                    <td style="padding:26px 24px 6px;">
-                      <div style="font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#6b7280; font-size:13px; font-weight:700;">
-                        STUDYHUB
-                      </div>
-                      <h1 style="margin:12px 0 0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:24px; color:#111827;">
-                        Konfirmasi Email
-                      </h1>
-                      <p style="margin:12px 0 0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:15px; line-height:1.6; color:#4b5563;">
-                        Kamu belum verifikasi email. Klik tombol ini untuk verifikasi akun kamu.
-                      </p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding:20px 24px 26px;">
-                      <a href="${verifyUrl}" style="display:inline-block; padding:13px 20px; background:#4f46e5; color:#fff; border-radius:12px; text-decoration:none; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:14px; font-weight:800;">
-                        Verify Email
-                      </a>
-                      <p style="margin:12px 0 0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:13px; color:#6b7280;">
-                        Link berlaku 24 jam.
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `,
-  })
-
-  return result
 }
 
 async function sendWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<{ timedOut: boolean; result?: T }> {
@@ -99,10 +35,6 @@ async function sendWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promi
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const { email, password } = body as { email?: string; password?: string }
-
-  if (!process.env.RESEND_API_KEY) {
-    return NextResponse.json({ message: 'RESEND_API_KEY belum diset.' }, { status: 500 })
-  }
 
   let userId: string | null = null
   let userEmail: string | null = null
@@ -231,11 +163,9 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  const resend = new Resend(process.env.RESEND_API_KEY)
-  const sendResult = await sendWithTimeout(resend.emails.send({
-    from: process.env.EMAIL_FROM || 'StudyHub <onboarding@resend.dev>',
+  const sendResult = await sendWithTimeout(sendEmail({
     to: userEmail,
-      subject: 'Login Verification Code - StudyHub',
+    subject: 'Login Verification Code - StudyHub',
     html: `
       <!doctype html>
       <html>
@@ -279,7 +209,7 @@ export async function POST(req: NextRequest) {
           </table>
         </body>
       </html>
-    `,
+    `
   }), EMAIL_SEND_TIMEOUT_MS)
 
   if (sendResult.timedOut) {
@@ -293,4 +223,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ message: 'OTP berhasil dikirim ke email kamu.' })
 }
-

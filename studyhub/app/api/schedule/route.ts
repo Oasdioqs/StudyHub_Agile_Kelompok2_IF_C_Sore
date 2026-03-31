@@ -3,12 +3,39 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { findAllScheduleSlotsForUser, replaceAllScheduleSlots } from '@/lib/weekly-schedule-db'
 
+import { db } from '@/lib/db'
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const slots = await findAllScheduleSlotsForUser(session.user.id)
-  return NextResponse.json(slots)
+  const personalSlots = await findAllScheduleSlotsForUser(session.user.id)
+  
+  // Ambil jadwal kelas
+  const memberships = await db.groupMember.findMany({
+    where: { userId: session.user.id },
+    select: { groupId: true, role: true }
+  })
+  const adminGroups = new Set(memberships.filter(m => m.role === 'ADMIN').map(m => m.groupId))
+  const groupIds = memberships.map(m => m.groupId)
+
+  const classSlotsRaw = await db.classScheduleSlot.findMany({
+    where: { groupId: { in: groupIds } },
+    include: { group: { select: { name: true } } }
+  })
+
+  const classSlots = classSlotsRaw.map((s: any) => ({
+    id: s.id,
+    dayOfWeek: s.dayOfWeek,
+    title: `${s.title} (${s.group.name})`,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    place: s.place,
+    groupId: s.groupId,
+    isAdmin: adminGroups.has(s.groupId)
+  }))
+
+  return NextResponse.json([...personalSlots, ...classSlots])
 }
 
 type SlotInput = {

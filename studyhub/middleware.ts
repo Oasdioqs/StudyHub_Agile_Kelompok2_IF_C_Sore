@@ -12,6 +12,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/auth/login', req.url))
   }
 
+  // Cek apakah pengguna sudah melewati verifikasi OTP
+  const otpVerifiedFor = req.cookies.get(OTP_COOKIE)?.value
+  if (otpVerifiedFor !== token.id) {
+    return NextResponse.redirect(new URL('/auth/verify-login-otp', req.url))
+  }
+
   return NextResponse.next()
 }
 
@@ -20,11 +26,16 @@ export const config = {
     '/dashboard/:path*',
     '/calendar',
     '/calendar/:path*',
+    '/kelas',
+    '/kelas/:path*',
     '/tasks/:path*',
     '/notes/:path*',
     '/forum/:path*',
+    '/flashcards/:path*',
     '/ai-tutor/:path*',
     '/timer/:path*',
+    '/leaderboard/:path*',
+    '/analytics/:path*',
     '/profile/:path*',
   ],
 }

@@ -1,19 +1,10 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { db } from '@/lib/db'
-import { Resend } from 'resend'
+import { sendEmail } from '@/lib/mail'
 
 export async function POST(req: Request) {
   const { email } = await req.json()
-
-  if (!process.env.RESEND_API_KEY) {
-    return NextResponse.json(
-      { message: 'RESEND_API_KEY belum diset di environment.' },
-      { status: 500 },
-    )
-  }
-
-  const resend = new Resend(process.env.RESEND_API_KEY)
 
   const user = await db.user.findUnique({ where: { email } })
 
@@ -34,10 +25,9 @@ export async function POST(req: Request) {
   const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
   const link = `${baseUrl}/auth/reset-password?token=${token}`
 
-  const from = process.env.EMAIL_FROM || 'StudyHub <onboarding@resend.dev>'
-  const result = await resend.emails.send({
-    from,
-    to: email,
+  try {
+    const result = await sendEmail({
+      to: email,
     subject: 'Reset Password StudyHub 🔐',
     html: `
       <!doctype html>
@@ -104,20 +94,18 @@ export async function POST(req: Request) {
         </body>
       </html>
     `,
-  })
+    })
 
-  console.log('RESEND SEND RESULT:', result)
+    console.log('RESET LINK:', link)
 
-  console.log('RESET LINK:', link)
-
-  if ((result as any)?.error) {
+    return NextResponse.json({ message: 'Link reset dikirim', messageId: result.messageId })
+  } catch (error: any) {
+    console.error('MAIL SEND ERROR:', error)
     return NextResponse.json(
       {
-        message: (result as any).error.message || 'Gagal mengirim email reset password.',
+        message: error.message || 'Gagal mengirim email reset password.',
       },
       { status: 500 },
     )
   }
-
-  return NextResponse.json({ message: 'Link reset dikirim', resendId: (result as any)?.id })
 }

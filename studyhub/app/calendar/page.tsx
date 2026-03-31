@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatRemainingBeforeDeadline, formatSlotDurationLabel } from '@/lib/activity-metrics'
 import { WEEKDAY_LABELS, mondayFirstIndex } from '@/lib/schedule-week'
+import { SessionModeToggle, AttendanceSelect } from '@/components/calendar/CalendarControls'
 
 type CalendarTask = {
   id: string
@@ -20,6 +21,8 @@ type ScheduleSlot = {
   startTime: string | null
   endTime: string | null
   place: string | null
+  groupId?: string | null
+  isAdmin?: boolean
 }
 
 type DaySlot = { title: string; startTime: string; endTime: string; place: string }
@@ -467,9 +470,12 @@ export default function CalendarPage() {
                       <div key={s.id} className="agenda-item agenda-schedule">
                         <div className="agenda-title-row">
                           <div className="agenda-title">{s.title}</div>
-                          <span className="badge schedule-badge">Jadwal</span>
+                          <div className="d-flex align-items-center gap-2">
+                            <SessionModeToggle slotId={s.id} slotType={s.groupId ? 'class' : 'personal'} dateStr={selectedKey} groupId={s.groupId ?? undefined} isAdmin={s.isAdmin} />
+                            <span className="badge schedule-badge">Jadwal</span>
+                          </div>
                         </div>
-                        <div className="agenda-meta">
+                        <div className="agenda-meta mt-1">
                           {(s.startTime || s.endTime) && (
                             <>
                               <span>
@@ -485,6 +491,7 @@ export default function CalendarPage() {
                             </>
                           )}
                           {!s.startTime && !s.endTime && s.place && <span>{s.place}</span>}
+                          <AttendanceSelect slotId={s.id} slotType={s.groupId ? 'class' : 'personal'} dateStr={selectedKey} />
                         </div>
                       </div>
                       )

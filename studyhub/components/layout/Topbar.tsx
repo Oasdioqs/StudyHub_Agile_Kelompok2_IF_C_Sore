@@ -1,7 +1,16 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+
+function timeAgo(dateString: string) {
+  const date = new Date(dateString);
+  const diffInSeconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  if (diffInSeconds < 60) return `${Math.max(0, diffInSeconds)} detik lalu`;
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} menit lalu`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} jam lalu`;
+  return `${Math.floor(diffInSeconds / 86400)} hari lalu`;
+}
 
 const titles: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -45,11 +54,47 @@ export default function Topbar() {
   const [keyword, setKeyword] = useState(q)
   const [showMenuSearch, setShowMenuSearch] = useState(false)
   const [isDark, setIsDark] = useState(false)
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [showNotifs, setShowNotifs] = useState(false)
+  const notifRef = useRef<HTMLDivElement>(null)
+
   const updateTaskFilter = (key: 'status' | 'priority', value: string) => {
     const params = new URLSearchParams(searchParams.toString())
     if (value) params.set(key, value)
     else params.delete(key)
     router.push(`/tasks${params.toString() ? `?${params.toString()}` : ''}`)
+  }
+
+  useEffect(() => {
+    fetch('/api/notifications')
+      .then(res => res.json())
+      .then(data => {
+        if (data.notifications) {
+          setNotifications(data.notifications)
+          setUnreadCount(data.unreadCount || 0)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setShowNotifs(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleOpenNotifs = () => {
+    setShowNotifs(!showNotifs)
+    if (!showNotifs && unreadCount > 0) {
+      fetch('/api/notifications', { method: 'PATCH' }).catch(() => {})
+      setUnreadCount(0)
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
+    }
   }
 
   const searchLower = normalizeText(keyword.trim())
@@ -245,12 +290,42 @@ export default function Topbar() {
           <i className="bi bi-robot me-1" aria-hidden></i>
           <span className="topbar-btn-text-full">Tanya AI</span>
         </Link>
-        <button className="btn btn-sm topbar-icon-btn position-relative" title="Notifikasi">
-          <i className="bi bi-bell" style={{ fontSize: 17 }}></i>
-          <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style={{ fontSize: 10 }}>
-            3
-          </span>
-        </button>
+        <div className="position-relative" ref={notifRef}>
+          <button 
+            className="btn btn-sm topbar-icon-btn position-relative" 
+            title="Notifikasi"
+            onClick={handleOpenNotifs}
+          >
+            <i className="bi bi-bell" style={{ fontSize: 17 }}></i>
+            {unreadCount > 0 && (
+              <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style={{ fontSize: 10 }}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+          {showNotifs && (
+            <div className="dropdown-menu dropdown-menu-end show shadow-sm" style={{ position: 'absolute', top: '100%', right: 0, width: 320, padding: 0, marginTop: '10px', maxHeight: '400px', overflowY: 'auto' }}>
+              <div className="p-3 border-bottom bg-light">
+                <h6 className="mb-0 fw-bold">Notifikasi</h6>
+              </div>
+              {notifications.length === 0 ? (
+                <div className="p-4 text-center text-muted small">Belum ada aktivitas baru.</div>
+              ) : (
+                <div className="list-group list-group-flush">
+                  {notifications.map((n) => (
+                    <div key={n.id} className={`list-group-item list-group-item-action p-3 ${n.isRead ? '' : 'bg-light'}`} onClick={() => { setShowNotifs(false); if (n.link) router.push(n.link); }} style={{ cursor: 'pointer' }}>
+                      <div className="d-flex w-100 justify-content-between mb-1">
+                        <strong className="small text-truncate me-2">{n.title}</strong>
+                        <small className="text-muted" style={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>{timeAgo(n.createdAt)}</small>
+                      </div>
+                      <p className="mb-0 small text-muted lh-sm">{n.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <Link href="/profile" className="topbar-avatar" title="Profil">
           <i className="bi bi-person-circle"></i>
         </Link>

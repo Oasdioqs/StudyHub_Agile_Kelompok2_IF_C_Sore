@@ -40,6 +40,7 @@ model User {
   loginOtps        LoginOtp[]
   dashboardDays       DashboardDay[]
   weeklyScheduleSlots WeeklyScheduleSlot[]
+  attendanceRecords   AttendanceRecord[]
 
   @@map("users")
 }
@@ -163,15 +164,17 @@ model Note {
 }
 
 model Group {
-  id          String        @id @default(cuid())
-  name        String
-  description String?
-  inviteCode  String        @unique @default(cuid())
-  subject     String?
-  maxMembers  Int           @default(30)
-  createdAt   DateTime      @default(now())
-  members     GroupMember[]
-  notes       Note[]
+  id                 String              @id @default(cuid())
+  name               String
+  description        String?
+  inviteCode         String              @unique @default(cuid())
+  subject            String?
+  maxMembers         Int                 @default(30)
+  createdAt          DateTime            @default(now())
+  members            GroupMember[]
+  notes              Note[]
+  classTasks         ClassTask[]
+  classScheduleSlots ClassScheduleSlot[]
 
   @@map("groups")
 }
@@ -187,6 +190,79 @@ model GroupMember {
 
   @@unique([userId, groupId])
   @@map("group_members")
+}
+
+// Tugas yang dibuat komisaris untuk seluruh anggota kelas
+model ClassTask {
+  id          String     @id @default(cuid())
+  groupId     String
+  group       Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  deadline    DateTime?
+  priority    Priority   @default(MEDIUM)
+  subject     String?
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([groupId])
+  @@map("class_tasks")
+}
+
+// Jadwal kuliah mingguan yang dibagi ke seluruh anggota kelas
+model ClassScheduleSlot {
+  id          String   @id @default(cuid())
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int
+  title       String
+  startTime   String?
+  endTime     String?
+  place       String?
+  sortOrder   Int      @default(0)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([groupId, dayOfWeek])
+  @@map("class_schedule_slots")
+}
+
+// Absensi: per user, per slot (personal/kelas), per tanggal spesifik
+model AttendanceRecord {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slotId    String           // WeeklyScheduleSlot.id atau ClassScheduleSlot.id
+  slotType  String           // "personal" | "class"
+  date      DateTime         // tanggal spesifik (dinormalisasi ke midnight UTC)
+  status    AttendanceStatus
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([userId, slotId, slotType, date])
+  @@index([userId, date])
+  @@map("attendance_records")
+}
+
+// Override mode kelas per tanggal: default LANGSUNG, bisa diubah ke MAYA
+// Jika tidak ada record untuk slot+date = LANGSUNG (default)
+model ClassSessionMode {
+  id        String      @id @default(cuid())
+  slotId    String      // WeeklyScheduleSlot.id atau ClassScheduleSlot.id
+  slotType  String      // "personal" | "class"
+  date      DateTime    // tanggal spesifik
+  mode      SessionMode @default(MAYA) // hanya simpan saat override ke MAYA
+  note      String?
+  setById   String
+  groupId   String?     // jika class slot, untuk referensi grup
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([slotId, slotType, date])
+  @@index([slotId, date])
+  @@map("class_session_modes")
 }
 
 model Thread {
@@ -299,4 +375,16 @@ enum TaskStatus {
 enum GroupRole {
   ADMIN
   MEMBER
+}
+
+enum AttendanceStatus {
+  HADIR
+  TIDAK_HADIR
+  SAKIT
+  IZIN
+}
+
+enum SessionMode {
+  MAYA
+  LANGSUNG
 }

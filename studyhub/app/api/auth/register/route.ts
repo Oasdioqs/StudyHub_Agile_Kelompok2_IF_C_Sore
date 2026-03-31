@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
-
+import { resendVerificationEmail } from '@/lib/mail'
 export async function POST(req: NextRequest) {
   const { name, email, password } = await req.json()
 
@@ -28,10 +28,12 @@ export async function POST(req: NextRequest) {
       name,
       email,
       password: hashed,
-      emailVerified: new Date(),
+      // emailVerified: new Date(), dihapus agar user wajib verifikasi email
     },
     select: { id: true, name: true, email: true },
   })
+
+  await resendVerificationEmail(user.email)
 
   return NextResponse.json(user, { status: 201 })
 }

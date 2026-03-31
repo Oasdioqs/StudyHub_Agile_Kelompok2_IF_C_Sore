@@ -69,16 +69,16 @@ export async function POST(req: NextRequest) {
 
   cookies().set(OTP_COOKIE_NAME, userId, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'none',
+    secure: true,
     maxAge: 60 * 30,
     path: '/',
   })
 
   cookies().set(EMAIL_VERIFIED_COOKIE_NAME, userId, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'none',
+    secure: true,
     maxAge: 60 * 30,
     path: '/',
   })
