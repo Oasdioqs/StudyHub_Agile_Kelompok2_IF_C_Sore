@@ -10,7 +10,7 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const personalSlots = await findAllScheduleSlotsForUser(session.user.id)
-  
+
   // Ambil jadwal kelas
   const memberships = await db.groupMember.findMany({
     where: { userId: session.user.id },
@@ -24,23 +24,38 @@ export async function GET() {
     include: { group: { select: { name: true } } }
   })
 
-  // Ambil mode & live meeting URL dari ClassSessionMode (minggu ini)
-  const today = new Date()
-  const dayOfWeekUTC = today.getUTCDay()
-  const weekStartMs = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - dayOfWeekUTC)
-  const weekStart = new Date(weekStartMs)
-  const classSlotIds = classSlotsRaw.map((s: any) => s.id)
-  const sessionModes = classSlotIds.length > 0
-    ? await db.classSessionMode.findMany({
-        where: { slotId: { in: classSlotIds }, slotType: 'class', date: weekStart }
-      })
-    : []
-  const sessionModeMap: Record<string, { mode: string; note: string | null }> = {}
-  for (const sm of sessionModes) {
-    sessionModeMap[sm.slotId] = { mode: sm.mode, note: sm.note }
+  /**
+   * Hitung tanggal aktual hari ini untuk dayOfWeek tertentu (minggu berjalan)
+   * dayOfWeek: 0=Minggu, 1=Senin, ..., 6=Sabtu (sama seperti JS getUTCDay)
+   */
+  function getSlotDate(dayOfWeek: number): Date {
+    const today = new Date()
+    const todayUTCDay = today.getUTCDay()
+    const diffToMonday = todayUTCDay === 0 ? -6 : 1 - todayUTCDay
+    const mondayMs = Date.UTC(
+      today.getUTCFullYear(), today.getUTCMonth(),
+      today.getUTCDate() + diffToMonday
+    )
+    const offsetFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+    return new Date(mondayMs + offsetFromMonday * 86400000)
   }
 
-  const classSlots = classSlotsRaw.map((s: any) => ({
+  // Ambil mode per slot menggunakan tanggal aktual hari masing-masing
+  const sessionModeRecords = await Promise.all(
+    classSlotsRaw.map((s: any) =>
+      db.classSessionMode.findUnique({
+        where: {
+          slotId_slotType_date: {
+            slotId: s.id,
+            slotType: 'class',
+            date: getSlotDate(s.dayOfWeek),
+          },
+        },
+      })
+    )
+  )
+
+  const classSlots = classSlotsRaw.map((s: any, i: number) => ({
     id: s.id,
     dayOfWeek: s.dayOfWeek,
     title: `${s.title} (${s.group.name})`,
@@ -49,8 +64,8 @@ export async function GET() {
     place: s.place,
     groupId: s.groupId,
     isAdmin: adminGroups.has(s.groupId),
-    syncMode: sessionModeMap[s.id]?.mode || 'LANGSUNG',
-    liveMeetingUrl: sessionModeMap[s.id]?.note || null,
+    syncMode: sessionModeRecords[i]?.mode || 'LANGSUNG',
+    liveMeetingUrl: sessionModeRecords[i]?.note || null,
   }))
 
   return NextResponse.json([...personalSlots, ...classSlots])
