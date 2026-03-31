@@ -2,6 +2,12 @@
 
 import { SessionProvider } from 'next-auth/react'
 import { useEffect } from 'react'
+import { useFCM } from '@/hooks/useFCM'
+
+function FCMProvider({ children }: { children: React.ReactNode }) {
+  useFCM()
+  return <>{children}</>
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -19,5 +25,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     initApp()
   }, [])
 
-  return <SessionProvider>{children}</SessionProvider>
+  return (
+    <SessionProvider>
+      <FCMProvider>{children}</FCMProvider>
+    </SessionProvider>
+  )
 }

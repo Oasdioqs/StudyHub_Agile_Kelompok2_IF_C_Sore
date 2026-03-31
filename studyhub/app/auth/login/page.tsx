@@ -134,7 +134,11 @@ export default function LoginPage() {
         
         
         <div className="text-center mb-4">
-          <i className="bi bi-book-half icon-main"></i>
+          <div className="d-flex align-items-center justify-content-center gap-2 mb-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.svg" alt="StudyHub" style={{ width: 40, height: 40, borderRadius: 10 }} />
+            <span className="fw-bold" style={{ fontSize: '1.5rem', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>StudyHub</span>
+          </div>
           <h4 className="fw-bold mb-1">Masuk ke StudyHub</h4>
           <p className="text-muted small">
             Belum punya akun?{' '}

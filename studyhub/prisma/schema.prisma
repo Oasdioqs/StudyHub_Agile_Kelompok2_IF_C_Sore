@@ -26,21 +26,23 @@ model User {
   updatedAt        DateTime       @updatedAt
   resetToken       String?
   resetTokenExpiry DateTime?
-  accounts         Account[]
-  aiSessions       AISession[]
-  flashcardSets    FlashcardSet[]
-  groupMembers     GroupMember[]
-  notes            Note[]
-  notifications    Notification[]
-  replies          Reply[]
-  sessions         Session[]
-  tasks            Task[]
-  threads          Thread[]
-  timerSessions    TimerSession[]
-  loginOtps        LoginOtp[]
-  dashboardDays       DashboardDay[]
-  weeklyScheduleSlots WeeklyScheduleSlot[]
-  attendanceRecords   AttendanceRecord[]
+  accounts              Account[]
+  aiSessions            AISession[]
+  flashcardSets         FlashcardSet[]
+  groupMembers          GroupMember[]
+  notes                 Note[]
+  notifications         Notification[]
+  replies               Reply[]
+  sessions              Session[]
+  tasks                 Task[]
+  threads               Thread[]
+  timerSessions         TimerSession[]
+  loginOtps             LoginOtp[]
+  dashboardDays         DashboardDay[]
+  weeklyScheduleSlots   WeeklyScheduleSlot[]
+  attendanceRecords     AttendanceRecord[]
+  notificationSetting   UserNotificationSetting?
+  pushTokens            FcmToken[]
 
   @@map("users")
 }
@@ -164,17 +166,19 @@ model Note {
 }
 
 model Group {
-  id                 String              @id @default(cuid())
-  name               String
-  description        String?
-  inviteCode         String              @unique @default(cuid())
-  subject            String?
-  maxMembers         Int                 @default(30)
-  createdAt          DateTime            @default(now())
-  members            GroupMember[]
-  notes              Note[]
-  classTasks         ClassTask[]
-  classScheduleSlots ClassScheduleSlot[]
+  id                    String                    @id @default(cuid())
+  name                  String
+  description           String?
+  inviteCode            String                    @unique @default(cuid())
+  subject               String?
+  maxMembers            Int                       @default(30)
+  createdAt             DateTime                  @default(now())
+  members               GroupMember[]
+  notes                 Note[]
+  classTasks            ClassTask[]
+  classScheduleSlots    ClassScheduleSlot[]
+  announcements         ClassAnnouncement[]
+  notificationSetting   ClassNotificationSetting?
 
   @@map("groups")
 }
@@ -208,6 +212,62 @@ model ClassTask {
 
   @@index([groupId])
   @@map("class_tasks")
+}
+
+// Pengumuman / Broadcast dari komisaris ke seluruh anggota kelas
+model ClassAnnouncement {
+  id          String   @id @default(cuid())
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title       String
+  message     String
+  createdById String   // userId komisaris
+  createdAt   DateTime @default(now())
+
+  @@index([groupId, createdAt])
+  @@map("class_announcements")
+}
+
+// Pengaturan notifikasi reminder per kelas (diset komisaris)
+model ClassNotificationSetting {
+  id                String   @id @default(cuid())
+  groupId           String   @unique
+  group             Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  // Menit-menit sebelum deadline tugas/jadwal yang akan dikirim notif (e.g. [120, 60, 30, 10])
+  taskReminders     Int[]    @default([120, 60])
+  scheduleReminders Int[]    @default([120, 60])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("class_notification_settings")
+}
+
+// Pengaturan notifikasi reminder personal per user
+model UserNotificationSetting {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Interval menit sebelum deadline tugas pribadi untuk reminder
+  taskReminders     Int[]    @default([120, 60])
+  // Interval menit sebelum jadwal pribadi untuk reminder
+  scheduleReminders Int[]    @default([120, 60])
+  updatedAt         DateTime @updatedAt
+
+  @@map("user_notification_settings")
+}
+
+// FCM push notification tokens per device
+model FcmToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique  // FCM registration token
+  platform  String   @default("web")  // "web" | "android" | "ios"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("fcm_tokens")
 }
 
 // Jadwal kuliah mingguan yang dibagi ke seluruh anggota kelas

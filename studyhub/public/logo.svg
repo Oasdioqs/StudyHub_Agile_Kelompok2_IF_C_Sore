@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="grad1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="grad2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <!-- book body left page -->
+  <path d="M6 10C6 8.343 7.343 7 9 7H22V38H9C7.343 38 6 36.657 6 35V10Z" fill="url(#grad1)"/>
+  <!-- book body right page -->
+  <path d="M42 10C42 8.343 40.657 7 39 7H26V38H39C40.657 38 42 36.657 42 35V10Z" fill="url(#grad2)" opacity="0.85"/>
+  <!-- spine -->
+  <rect x="22" y="7" width="4" height="31" fill="white" opacity="0.3"/>
+  <!-- book base -->
+  <path d="M6 35C6 36.657 7.343 38 9 38H39C40.657 38 42 36.657 42 35V37C42 38.657 40.657 40 39 40H9C7.343 40 6 38.657 6 37V35Z" fill="url(#grad1)" opacity="0.5"/>
+  <!-- lightning bolt spark -->
+  <path d="M27.5 14L21 24H25.5L20.5 34L30 22H25L27.5 14Z" fill="white" opacity="0.95"/>
+</svg>

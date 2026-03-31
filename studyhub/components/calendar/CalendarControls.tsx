@@ -116,7 +116,7 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
   }
 
   return (
-    <div className="position-relative d-inline-block ms-auto ms-sm-2 mt-2 mt-sm-0 flex-shrink-0" style={{ zIndex: isOpen ? 100 : 1 }}>
+    <div className="position-relative d-inline-block ms-auto ms-sm-2 mt-2 mt-sm-0 flex-shrink-0" style={{ zIndex: isOpen ? 9999 : 2 }}>
       <button 
         type="button"
         className="btn btn-sm d-flex align-items-center gap-2 fw-bold" 
@@ -138,7 +138,7 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
         <i className="bi bi-chevron-down" style={{ fontSize: '9px', opacity: 0.9 }}></i>
       </button>
       {isOpen && (
-        <ul className="dropdown-menu dropdown-menu-end show shadow border-0 position-absolute" style={{ top: '100%', right: 0, marginTop: '4px', borderRadius: '16px', overflow: 'hidden', minWidth: '160px', zIndex: 1050, background: 'var(--sh-card-bg)' }}>
+        <ul className="dropdown-menu dropdown-menu-end show shadow border-0 position-absolute" style={{ top: '100%', right: 0, marginTop: '4px', borderRadius: '16px', overflow: 'hidden', minWidth: '160px', zIndex: 9999, background: 'var(--sh-card-bg)' }}>
           <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: 'var(--sh-text)' }} onClick={() => handleStatusChange('HADIR')}><i className="bi bi-check-circle text-success me-2"></i>Hadir</button></li>
           <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: 'var(--sh-text)' }} onClick={() => handleStatusChange('IZIN')}><i className="bi bi-envelope-paper text-primary me-2"></i>Izin</button></li>
           <li><button type="button" className="dropdown-item py-2 fw-semibold" style={{ fontSize: '12px', color: 'var(--sh-text)' }} onClick={() => handleStatusChange('SAKIT')}><i className="bi bi-thermometer text-warning me-2"></i>Sakit</button></li>
@@ -149,3 +149,4 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
     </div>
   )
 }
+

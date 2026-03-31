@@ -23,6 +23,8 @@ type ScheduleSlot = {
   place: string | null
   groupId?: string | null
   isAdmin?: boolean
+  syncMode?: string
+  liveMeetingUrl?: string | null
 }
 
 type DaySlot = { title: string; startTime: string; endTime: string; place: string }
@@ -466,11 +468,17 @@ export default function CalendarPage() {
                   <div className="agenda-list">
                     {selectedScheduleSlots.map((s) => {
                       const dur = formatSlotDurationLabel(s.startTime, s.endTime)
+                      const isMAYA = s.syncMode === 'MAYA'
                       return (
                       <div key={s.id} className="agenda-item agenda-schedule">
                         <div className="agenda-title-row">
                           <div className="agenda-title">{s.title}</div>
                           <div className="d-flex align-items-center gap-2">
+                            {isMAYA && (
+                              <span className="badge maya-badge" title="Sinkron Maya (Online)">
+                                <i className="bi bi-display me-1"></i>Maya
+                              </span>
+                            )}
                             <SessionModeToggle slotId={s.id} slotType={s.groupId ? 'class' : 'personal'} dateStr={selectedKey} groupId={s.groupId ?? undefined} isAdmin={s.isAdmin} />
                             <span className="badge schedule-badge">Jadwal</span>
                           </div>
@@ -497,6 +505,14 @@ export default function CalendarPage() {
                             <AttendanceSelect slotId={s.id} slotType={s.groupId ? 'class' : 'personal'} dateStr={selectedKey} />
                           </div>
                         </div>
+                        {/* Live Meeting Link */}
+                        {s.liveMeetingUrl && (
+                          <div className="agenda-live-meeting">
+                            <a href={s.liveMeetingUrl} target="_blank" rel="noopener noreferrer" className="agenda-live-btn">
+                              <i className="bi bi-camera-video-fill"></i> Buka Live Meeting
+                            </a>
+                          </div>
+                        )}
                       </div>
                       )
                     })}
@@ -893,8 +909,28 @@ export default function CalendarPage() {
         .dot-sep { opacity: 0.7; }
         .badge { font-size: 10px; border-radius: 999px; padding: 4px 8px; text-transform: uppercase; }
         .schedule-badge { background: #ccfbf1; color: #0f766e; }
+        .maya-badge { background: #eef2ff; color: #4338ca; }
         .status-todo { background: #e2e8f0; color: #334155; }
         .status-done { background: #dcfce7; color: #166534; }
+        .agenda-live-meeting {
+          margin-top: 8px;
+          border-top: 1px dashed rgba(13, 148, 136, 0.25);
+          padding-top: 8px;
+        }
+        .agenda-live-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background: linear-gradient(135deg, #4f46e5, #7c3aed);
+          color: white;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 700;
+          text-decoration: none;
+          transition: all 0.15s ease;
+        }
+        .agenda-live-btn:hover { opacity: 0.88; color: white; transform: translateY(-1px); }
         .schedule-modal-backdrop {
           position: fixed;
           inset: 0;

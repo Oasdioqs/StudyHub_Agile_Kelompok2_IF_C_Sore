@@ -168,6 +168,11 @@ export default function VerifyLoginOtpPage() {
     <div className="verify-login-otp-wrapper">
       <div className="card verify-login-otp-card p-4 p-md-5">
         <div className="text-center mb-3">
+          <div className="d-flex align-items-center justify-content-center gap-2 mb-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.svg" alt="StudyHub" style={{ width: 36, height: 36, borderRadius: 8 }} />
+            <span className="fw-bold" style={{ fontSize: '1.3rem', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>StudyHub</span>
+          </div>
           <h4 className="fw-bold mb-1">Masukkan Kode OTP</h4>
           <p className="text-muted small mb-0">
             Kami mengirim kode verifikasi ke{' '}
@@ -204,10 +209,21 @@ export default function VerifyLoginOtpPage() {
 
           <div className="mt-3 d-flex gap-2">
             <button
+              type="submit"
               className="btn btn-modern w-100 fw-semibold"
-              disabled={requestLoading || verifyLoading || !/^\d{6}$/.test(otp)}
+              disabled={requestLoading || verifyLoading || !/^\d{6}$/.test(otp) || verified}
             >
-              {verifyLoading ? 'Memverifikasi...' : 'Verifikasi'}
+              {verified ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <span style={{
+                    display: 'inline-block', width: 16, height: 16,
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTopColor: 'white', borderRadius: '50%',
+                    animation: 'spin 0.7s linear infinite', flexShrink: 0
+                  }} />
+                  Menuju Dashboard...
+                </span>
+              ) : verifyLoading ? 'Memverifikasi...' : 'Verifikasi'}
             </button>
           </div>
 
@@ -328,11 +344,22 @@ export default function VerifyLoginOtpPage() {
           letter-spacing: 0.2px;
         }
 
+        .btn-modern:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 8px 20px rgba(99,102,241,0.35);
+        }
+
         .btn-modern:disabled {
-          background: #d1d5db;
+          opacity: 0.8;
           cursor: not-allowed;
           box-shadow: none;
         }
+
+        .btn-modern.verified-state {
+          background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   )

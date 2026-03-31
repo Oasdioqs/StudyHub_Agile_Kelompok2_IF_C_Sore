@@ -24,19 +24,28 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     where: { groupId: params.id, NOT: { userId: session.user.id } },
   })
 
-  if (members.length === 0) {
-    return NextResponse.json({ ok: true, sent: 0 })
-  }
-
-  await db.notification.createMany({
-    data: members.map((m) => ({
-      userId: m.userId,
-      type: 'CLASS_ANNOUNCEMENT',
-      title: `📢 ${title.trim()} — ${group?.name}`,
+  // Simpan ke tabel ClassAnnouncement (bisa dibaca semua anggota di tab Pengumuman)
+  const announcement = await db.classAnnouncement.create({
+    data: {
+      groupId: params.id,
+      title: title.trim(),
       message: message.trim(),
-      link: `/kelas/${params.id}`,
-    })),
+      createdById: session.user.id,
+    },
   })
 
-  return NextResponse.json({ ok: true, sent: members.length })
+  // Kirim notif ke semua anggota (kecuali pengirim)
+  if (members.length > 0) {
+    await db.notification.createMany({
+      data: members.map((m) => ({
+        userId: m.userId,
+        type: 'CLASS_ANNOUNCEMENT',
+        title: `📢 ${title.trim()} — ${group?.name}`,
+        message: message.trim(),
+        link: `/kelas/${params.id}?tab=announcements`,
+      })),
+    })
+  }
+
+  return NextResponse.json({ ok: true, sent: members.length, announcement })
 }

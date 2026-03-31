@@ -56,7 +56,14 @@ export default function ResetPasswordClient() {
 
       <div className="card reset-card p-4 p-md-5">
 
-        <h4 className="text-center fw-bold mb-3">Reset Password</h4>
+        <div className="text-center mb-4">
+          <div className="d-flex align-items-center justify-content-center gap-2 mb-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.svg" alt="StudyHub" style={{ width: 36, height: 36, borderRadius: 8 }} />
+            <span className="fw-bold" style={{ fontSize: '1.3rem', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>StudyHub</span>
+          </div>
+          <h4 className="text-center fw-bold mb-1">Reset Password</h4>
+        </div>
 
         {error && (
           <div className="alert alert-danger small">{error}</div>

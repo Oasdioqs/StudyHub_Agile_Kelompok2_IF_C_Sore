@@ -26,6 +26,8 @@
     "bootstrap-icons": "^1.11.3",
     "chart.js": "^4.4.3",
     "date-fns": "^3.6.0",
+    "firebase": "^12.11.0",
+    "firebase-admin": "^13.7.0",
     "google-auth-library": "^9.15.1",
     "highlight.js": "^11.11.1",
     "next": "14.2.5",

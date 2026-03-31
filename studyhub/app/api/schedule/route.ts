@@ -24,6 +24,22 @@ export async function GET() {
     include: { group: { select: { name: true } } }
   })
 
+  // Ambil mode & live meeting URL dari ClassSessionMode (minggu ini)
+  const today = new Date()
+  const dayOfWeekUTC = today.getUTCDay()
+  const weekStartMs = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - dayOfWeekUTC)
+  const weekStart = new Date(weekStartMs)
+  const classSlotIds = classSlotsRaw.map((s: any) => s.id)
+  const sessionModes = classSlotIds.length > 0
+    ? await db.classSessionMode.findMany({
+        where: { slotId: { in: classSlotIds }, slotType: 'class', date: weekStart }
+      })
+    : []
+  const sessionModeMap: Record<string, { mode: string; note: string | null }> = {}
+  for (const sm of sessionModes) {
+    sessionModeMap[sm.slotId] = { mode: sm.mode, note: sm.note }
+  }
+
   const classSlots = classSlotsRaw.map((s: any) => ({
     id: s.id,
     dayOfWeek: s.dayOfWeek,
@@ -32,7 +48,9 @@ export async function GET() {
     endTime: s.endTime,
     place: s.place,
     groupId: s.groupId,
-    isAdmin: adminGroups.has(s.groupId)
+    isAdmin: adminGroups.has(s.groupId),
+    syncMode: sessionModeMap[s.id]?.mode || 'LANGSUNG',
+    liveMeetingUrl: sessionModeMap[s.id]?.note || null,
   }))
 
   return NextResponse.json([...personalSlots, ...classSlots])

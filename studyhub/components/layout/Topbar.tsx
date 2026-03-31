@@ -167,7 +167,11 @@ export default function Topbar() {
   return (
     <header className="topbar-modern sticky-top">
       <div className="topbar-left">
-        <p className="topbar-caption mb-1">StudyHub Workspace</p>
+        <div className="d-flex align-items-center gap-2 mb-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="StudyHub" style={{ width: 22, height: 22, borderRadius: 5, flexShrink: 0 }} />
+          <p className="topbar-caption mb-0">StudyHub Workspace</p>
+        </div>
         <h5 className="mb-0 fw-semibold topbar-title">{title}</h5>
       </div>
 
