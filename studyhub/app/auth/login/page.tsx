@@ -69,7 +69,7 @@ export default function LoginPage() {
     if (input) input.value = val
   }
 
-  const waitForSession = async (tries = 8, delayMs = 250) => {
+  const waitForSession = async (tries = 6, delayMs = 200) => {
     for (let i = 0; i < tries; i += 1) {
       const session = await getSession().catch(() => null)
       if (session?.user?.id) return true
@@ -88,7 +88,7 @@ export default function LoginPage() {
 
     try {
       const result = await signIn('credentials', {
-        email,
+        email: email.trim().toLowerCase(),
         password,
         redirect: false,
         callbackUrl: '/dashboard',
@@ -102,13 +102,11 @@ export default function LoginPage() {
       inputs.successTrigger?.fire?.()
       setSuccess('Login berhasil!')
 
-      const hasSession = await waitForSession(10, 300)
+      const hasSession = await waitForSession(6, 200)
       if (!hasSession || !result?.url) {
         throw new Error('Session belum siap. Coba sekali lagi.')
       }
-      if (typeof window !== 'undefined') {
-        window.location.replace(result.url)
-      }
+      router.push('/dashboard')
       return
     } catch (err: any) {
       setError(err?.message || 'Terjadi error.')

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { findAllScheduleSlotsForUser, replaceAllScheduleSlots } from '@/lib/weekly-schedule-db'
+import { findTodayScheduleForDashboard } from '@/lib/weekly-schedule-db'
+import { ensureRemindersForUser } from '@/lib/reminders'
+import { getJakartaDayRange, getJakartaMondayFirstIndex } from '@/lib/jakarta-time'
 
 import { db } from '@/lib/db'
 
@@ -25,19 +28,21 @@ export async function GET() {
   })
 
   /**
-   * Hitung tanggal aktual hari ini untuk dayOfWeek tertentu (minggu berjalan)
-   * dayOfWeek: 0=Minggu, 1=Senin, ..., 6=Sabtu (sama seperti JS getUTCDay)
+   * Hitung tanggal lokal minggu ini untuk dayOfWeek tertentu.
+   * dayOfWeek mengikuti konvensi Monday-first: 0=Senin, 1=Selasa, ..., 6=Minggu
    */
   function getSlotDate(dayOfWeek: number): Date {
     const today = new Date()
-    const todayUTCDay = today.getUTCDay()
-    const diffToMonday = todayUTCDay === 0 ? -6 : 1 - todayUTCDay
-    const mondayMs = Date.UTC(
-      today.getUTCFullYear(), today.getUTCMonth(),
-      today.getUTCDate() + diffToMonday
+    const todayLocalDay = today.getDay()
+    const diffToMonday = todayLocalDay === 0 ? -6 : 1 - todayLocalDay
+    const monday = new Date(
+      today.getFullYear(), today.getMonth(), today.getDate() + diffToMonday,
+      0, 0, 0, 0
     )
-    const offsetFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-    return new Date(mondayMs + offsetFromMonday * 86400000)
+    const result = new Date(monday)
+    result.setDate(monday.getDate() + dayOfWeek)
+    result.setUTCHours(0, 0, 0, 0)
+    return result
   }
 
   // Ambil mode per slot menggunakan tanggal aktual hari masing-masing
@@ -67,6 +72,17 @@ export async function GET() {
     syncMode: sessionModeRecords[i]?.mode || 'LANGSUNG',
     liveMeetingUrl: sessionModeRecords[i]?.note || null,
   }))
+
+  // Fire reminders non-blocking (agar notifikasi muncul di bel saat user buka kalender)
+  const userId = session.user.id
+  void (async () => {
+    try {
+      const { start: todayStart, now: jakartaNow } = getJakartaDayRange()
+      const todayDow = getJakartaMondayFirstIndex()
+      const todaySchedule = await findTodayScheduleForDashboard(userId, todayDow)
+      await ensureRemindersForUser(userId, { jakartaNow, todayStart, todaySchedule, groupIds })
+    } catch {}
+  })()
 
   return NextResponse.json([...personalSlots, ...classSlots])
 }
@@ -124,5 +140,61 @@ export async function PUT(req: NextRequest) {
     )
   }
 
-  return NextResponse.json(slots)
+  // ── Gabungkan dengan jadwal kelas (sama seperti GET) agar frontend tidak kehilangan data ──
+  const memberships = await db.groupMember.findMany({
+    where: { userId },
+    select: { groupId: true, role: true }
+  })
+  const adminGroups = new Set(memberships.filter(m => m.role === 'ADMIN').map(m => m.groupId))
+  const groupIds = memberships.map(m => m.groupId)
+
+  const classSlotsRaw = groupIds.length > 0
+    ? await db.classScheduleSlot.findMany({
+        where: { groupId: { in: groupIds } },
+        include: { group: { select: { name: true } } }
+      })
+    : []
+
+  function getSlotDatePut(dayOfWeek: number): Date {
+    const today = new Date()
+    const todayLocalDay = today.getDay()
+    const diffToMonday = todayLocalDay === 0 ? -6 : 1 - todayLocalDay
+    const monday = new Date(
+      today.getFullYear(), today.getMonth(), today.getDate() + diffToMonday,
+      0, 0, 0, 0
+    )
+    const result = new Date(monday)
+    result.setDate(monday.getDate() + dayOfWeek)
+    result.setUTCHours(0, 0, 0, 0)
+    return result
+  }
+
+  const sessionModeRecords = await Promise.all(
+    classSlotsRaw.map((s: any) =>
+      db.classSessionMode.findUnique({
+        where: {
+          slotId_slotType_date: {
+            slotId: s.id,
+            slotType: 'class',
+            date: getSlotDatePut(s.dayOfWeek),
+          },
+        },
+      })
+    )
+  )
+
+  const classSlots = classSlotsRaw.map((s: any, i: number) => ({
+    id: s.id,
+    dayOfWeek: s.dayOfWeek,
+    title: `${s.title} (${s.group.name})`,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    place: s.place,
+    groupId: s.groupId,
+    isAdmin: adminGroups.has(s.groupId),
+    syncMode: sessionModeRecords[i]?.mode || 'LANGSUNG',
+    liveMeetingUrl: sessionModeRecords[i]?.note || null,
+  }))
+
+  return NextResponse.json([...slots, ...classSlots])
 }

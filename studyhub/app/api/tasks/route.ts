@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserIdFromRequest } from '@/lib/api-session'
 import { db } from '@/lib/db'
+import { createNotificationWithPush } from '@/lib/notification-push'
 
 export async function GET(req: NextRequest) {
   const userId = await getUserIdFromRequest(req)
@@ -11,50 +12,61 @@ export async function GET(req: NextRequest) {
   const priority = searchParams.get('priority')
   const q = searchParams.get('q')?.trim()
 
-  const tasks = await db.task.findMany({
-    where: {
-      userId,
-      ...(status && { status: status as any }),
-      ...(priority && { priority: priority as any }),
-      ...(q && {
-        OR: [
-          { title: { contains: q, mode: 'insensitive' as const } },
-          { description: { contains: q, mode: 'insensitive' as const } },
-          { subject: { contains: q, mode: 'insensitive' as const } },
-        ],
-      }),
-    },
-    orderBy: [
-      { deadline: { sort: 'asc', nulls: 'last' } },
-      { createdAt: 'desc' },
-    ],
-  })
+  const where = {
+    userId,
+    ...(status && { status: status as any }),
+    ...(priority && { priority: priority as any }),
+    ...(q && {
+      OR: [
+        { title: { contains: q, mode: 'insensitive' as const } },
+        { description: { contains: q, mode: 'insensitive' as const } },
+        { subject: { contains: q, mode: 'insensitive' as const } },
+      ],
+    }),
+  }
 
-  // Ambil class tasks
-  const memberships = await db.groupMember.findMany({
-    where: { userId },
-    select: { groupId: true, group: { select: { name: true } } }
-  })
-  const groupIds = memberships.map(m => m.groupId)
-  
-  const classTasksRaw = await db.classTask.findMany({
-    where: {
-      groupId: { in: groupIds },
-      ...(priority && { priority: priority as any }),
-      ...(q && {
-        OR: [
-          { title: { contains: q, mode: 'insensitive' as const } },
-          { description: { contains: q, mode: 'insensitive' as const } },
-          { subject: { contains: q, mode: 'insensitive' as const } },
+  let tasks: any[] = []
+  try {
+    tasks = await db.task.findMany({
+      where,
+      orderBy: [
+        { deadline: { sort: 'asc', nulls: 'last' } },
+        { createdAt: 'desc' },
+      ],
+    })
+  } catch {
+    return NextResponse.json([], { status: 200 })
+  }
+
+  // Ambil class tasks (best-effort; jangan gagalkan list task personal).
+  let classTasksRaw: any[] = []
+  try {
+    const memberships = await db.groupMember.findMany({
+      where: { userId },
+      select: { groupId: true, group: { select: { name: true } } }
+    })
+    const groupIds = memberships.map(m => m.groupId)
+    if (groupIds.length > 0) {
+      classTasksRaw = await db.classTask.findMany({
+        where: {
+          groupId: { in: groupIds },
+          ...(priority && { priority: priority as any }),
+          ...(q && {
+            OR: [
+              { title: { contains: q, mode: 'insensitive' as const } },
+              { description: { contains: q, mode: 'insensitive' as const } },
+              { subject: { contains: q, mode: 'insensitive' as const } },
+            ],
+          }),
+        },
+        include: { group: { select: { name: true } } },
+        orderBy: [
+          { deadline: { sort: 'asc', nulls: 'last' } },
+          { createdAt: 'desc' },
         ],
-      }),
-    },
-    include: { group: { select: { name: true } } },
-    orderBy: [
-      { deadline: { sort: 'asc', nulls: 'last' } },
-      { createdAt: 'desc' },
-    ],
-  })
+      })
+    }
+  } catch {}
 
   // Format sebagai class task (immutable tasks list)
   const classTasks = classTasksRaw.map((ct: any) => ({
@@ -105,16 +117,14 @@ export async function POST(req: NextRequest) {
       where: { id: userId },
       data: { points: { increment: 2 } },
     }),
-    db.notification.create({
-      data: {
-        userId,
-        type: 'TASK_CREATED',
-        title: 'Tugas baru ditambahkan',
-        message: `Tugas "${title}" berhasil ditambahkan${deadline ? ` (deadline ${new Date(deadline).toLocaleString('id-ID')})` : ''}.`,
-        link: '/tasks',
-      },
-    }),
   ])
+
+  await createNotificationWithPush(userId, {
+    type: 'TASK_CREATED',
+    title: 'Tugas baru ditambahkan',
+    message: `Tugas "${title}" berhasil ditambahkan${deadline ? ` (deadline ${new Date(deadline).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })})` : ''}.`,
+    link: '/tasks',
+  })
 
   return NextResponse.json(task, { status: 201 })
 }

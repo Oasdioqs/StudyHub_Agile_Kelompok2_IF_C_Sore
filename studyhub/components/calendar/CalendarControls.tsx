@@ -2,7 +2,23 @@
 
 import { useState, useEffect, useRef } from 'react'
 
-export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin }: { slotId: string, slotType: 'personal' | 'class', dateStr: string, groupId?: string, isAdmin?: boolean }) {
+/**
+ * SessionModeToggle
+ * - Untuk jadwal KELAS di kalender: selalu read-only (badge saja), karena mode hanya bisa diubah dari halaman kelas.
+ * - Untuk jadwal PERSONAL: bisa toggle + input link meeting.
+ * - Prop `onModeLoaded` callback opsional → kirim {mode, url} ke parent agar parent bisa render "Buka Live Meeting" di posisi lain.
+ */
+export function SessionModeToggle({
+  slotId, slotType, dateStr, groupId, isAdmin,
+  onModeLoaded,
+}: {
+  slotId: string
+  slotType: 'personal' | 'class'
+  dateStr: string
+  groupId?: string
+  isAdmin?: boolean
+  onModeLoaded?: (info: { mode: 'LANGSUNG' | 'MAYA'; url: string }) => void
+}) {
   const [mode, setMode] = useState<'LANGSUNG' | 'MAYA'>('LANGSUNG')
   const [loading, setLoading] = useState(true)
   const [liveMeetingUrl, setLiveMeetingUrl] = useState('')
@@ -15,10 +31,12 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
     fetch(`/api/session-mode?slotId=${slotId}&slotType=${slotType}&date=${dateStr}`)
       .then(res => res.json())
       .then(data => {
-        if (data.mode) setMode(data.mode)
+        const m = data.mode || 'LANGSUNG'
+        setMode(m)
         const note = data.record?.note || data.note || ''
         if (note) { setLiveMeetingUrl(note); setSavedUrl(note) }
         setLoading(false)
+        onModeLoaded?.({ mode: m, url: note })
       })
       .catch(() => setLoading(false))
   }, [slotId, slotType, dateStr])
@@ -28,10 +46,8 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
   }, [showUrlInput])
 
   const toggleMode = async () => {
-    if (slotType === 'class' && !isAdmin) return
     const newMode = mode === 'LANGSUNG' ? 'MAYA' : 'LANGSUNG'
     setMode(newMode)
-    // Kalau berubah ke MAYA → tampilkan input link (personal)
     if (newMode === 'MAYA' && slotType === 'personal') {
       setShowUrlInput(true)
     } else {
@@ -42,6 +58,7 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slotId, slotType, date: dateStr, mode: newMode, groupId })
     }).catch(() => setMode(mode))
+    onModeLoaded?.({ mode: newMode, url: savedUrl })
   }
 
   const handleSaveUrl = async () => {
@@ -54,6 +71,7 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
       })
       setSavedUrl(liveMeetingUrl.trim())
       setShowUrlInput(false)
+      onModeLoaded?.({ mode, url: liveMeetingUrl.trim() })
     } catch {
     } finally {
       setSavingUrl(false)
@@ -62,10 +80,9 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
 
   if (loading) return <span className="spinner-border spinner-border-sm text-primary" style={{ width: '12px', height: '12px' }}></span>
 
-  const canToggle = slotType === 'personal' || isAdmin
-
-  // Class slot yang bukan admin: tampilkan badge read-only (tidak bisa diubah)
-  if (!canToggle) {
+  // ── Jadwal KELAS di kalender: SELALU read-only badge (termasuk komisaris) ──
+  // Mode hanya bisa diubah dari halaman kelas, bukan dari kalender
+  if (slotType === 'class') {
     return (
       <span
         style={{
@@ -75,7 +92,7 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
           background: mode === 'MAYA' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'linear-gradient(135deg, #10b981, #059669)',
           color: '#fff',
         }}
-        title="Mode ditetapkan oleh komisaris"
+        title="Mode hanya bisa diubah dari halaman kelas"
       >
         <i className={`bi ${mode === 'MAYA' ? 'bi-laptop' : 'bi-person-video3'}`}></i>
         {mode === 'MAYA' ? 'Sesi Daring' : 'Sesi Luring'}
@@ -83,29 +100,30 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
     )
   }
 
+  // ── Jadwal PERSONAL: bisa toggle ──
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-      <button 
-        onClick={canToggle ? toggleMode : undefined}
-        className={`btn btn-sm d-flex align-items-center gap-1 fw-bold border-0 shadow-sm`}
-        style={{ 
-          cursor: canToggle ? 'pointer' : 'default', 
-          fontSize: '11px', 
+      <button
+        onClick={toggleMode}
+        className="btn btn-sm d-flex align-items-center gap-1 fw-bold border-0 shadow-sm"
+        style={{
+          cursor: 'pointer',
+          fontSize: '11px',
           padding: '4px 10px',
           borderRadius: '12px',
           background: mode === 'MAYA' ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
           color: '#ffffff',
           transition: 'all 0.2s ease',
-          transform: canToggle ? 'translateY(-1px)' : 'none'
+          transform: 'translateY(-1px)'
         }}
-        title={canToggle ? "Klik untuk ubah mode" : "Mode ditetapkan oleh komisaris"}
+        title="Klik untuk ubah mode"
       >
         <i className={`bi ${mode === 'MAYA' ? 'bi-laptop' : 'bi-person-video3'}`}></i>
         {mode === 'MAYA' ? 'Sesi Daring' : 'Sesi Luring'}
       </button>
 
       {/* Input live meeting muncul saat toggle ke MAYA (personal) */}
-      {showUrlInput && slotType === 'personal' && (
+      {showUrlInput && (
         <div style={{
           display: 'flex', flexDirection: 'column', gap: '6px',
           background: 'var(--sh-card-bg)', border: '1.5px solid #a5b4fc',
@@ -162,7 +180,7 @@ export function SessionModeToggle({ slotId, slotType, dateStr, groupId, isAdmin 
         </div>
       )}
 
-      {/* Tampilkan link kalau tersimpan dan mode MAYA */}
+      {/* Tampilkan link kalau tersimpan dan mode MAYA (personal only) */}
       {mode === 'MAYA' && savedUrl && !showUrlInput && (
         <a
           href={savedUrl}
@@ -212,7 +230,6 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
     }).catch(() => {})
   }
 
-  // Close dropdown on outside click (simple approach for standalone components by just letting onBlur handle it, or we use a ref)
   const toggleDropdown = () => setIsOpen(!isOpen)
 
   if (loading) return null
@@ -248,9 +265,9 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
 
   return (
     <div className="position-relative d-inline-block ms-auto ms-sm-2 mt-2 mt-sm-0 flex-shrink-0" style={{ zIndex: isOpen ? 9999 : 2 }}>
-      <button 
+      <button
         type="button"
-        className="btn btn-sm d-flex align-items-center gap-2 fw-bold" 
+        className="btn btn-sm d-flex align-items-center gap-2 fw-bold"
         onClick={toggleDropdown}
         onBlur={() => setTimeout(() => setIsOpen(false), 200)}
         style={{
@@ -280,4 +297,3 @@ export function AttendanceSelect({ slotId, slotType, dateStr }: { slotId: string
     </div>
   )
 }
-

@@ -37,17 +37,45 @@ export default function VerifyLoginOtpPage() {
     return null
   }, [])
 
+  const postJsonWithTimeout = useCallback(
+    async (url: string, payload: unknown, timeoutMs = 12000) => {
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: ctrl.signal,
+        })
+        return res
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          throw new Error('Request timeout. Cek koneksi internet lalu coba lagi.')
+        }
+        if (/failed to fetch|load failed/i.test(String(err?.message || ''))) {
+          throw new Error('Load failed. Cek internet atau coba lagi beberapa detik.')
+        }
+        throw err
+      } finally {
+        clearTimeout(timer)
+      }
+    },
+    [],
+  )
+
   const requestOtpByEmail = useCallback(
     async (email: string) => {
       setError('')
       setOtpMessage('')
       setRequestLoading(true)
       try {
-        const res = await fetch('/api/auth/request-login-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-        })
+        const requestOnce = () => postJsonWithTimeout('/api/auth/request-login-otp', { email }, 12000)
+        let res = await requestOnce()
+        if (res.status === 503) {
+          await new Promise((resolve) => setTimeout(resolve, 1200))
+          res = await requestOnce()
+        }
 
         const data = await res.json().catch(() => null)
         if (!res.ok) {
@@ -66,11 +94,11 @@ export default function VerifyLoginOtpPage() {
         setRequestLoading(false)
       }
     },
-    [router],
+    [router, postJsonWithTimeout],
   )
 
-  const requestOtp = useCallback(async () => {
-    if (requestedOtpRef.current) return
+  const requestOtp = useCallback(async (force = false) => {
+    if (requestedOtpRef.current && !force) return
     if (!sessionEmail) {
       const email = await waitForSessionEmail()
       if (!email) {
@@ -86,11 +114,12 @@ export default function VerifyLoginOtpPage() {
     setOtpMessage('')
     setRequestLoading(true)
     try {
-      const res = await fetch('/api/auth/request-login-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: sessionEmail }),
-      })
+      const requestOnce = () => postJsonWithTimeout('/api/auth/request-login-otp', { email: sessionEmail }, 12000)
+      let res = await requestOnce()
+      if (res.status === 503) {
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        res = await requestOnce()
+      }
 
       const data = await res.json().catch(() => null)
       if (!res.ok) {
@@ -108,7 +137,7 @@ export default function VerifyLoginOtpPage() {
     } finally {
       setRequestLoading(false)
     }
-  }, [sessionEmail, router, waitForSessionEmail, requestOtpByEmail])
+  }, [sessionEmail, router, waitForSessionEmail, requestOtpByEmail, postJsonWithTimeout])
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -133,11 +162,7 @@ export default function VerifyLoginOtpPage() {
         throw new Error('Email belum siap. Coba lagi.')
       }
 
-      const res = await fetch('/api/auth/verify-login-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: otp, email: emailForOtp }),
-      })
+      const res = await postJsonWithTimeout('/api/auth/verify-login-otp', { code: otp, email: emailForOtp }, 12000)
 
       const data = await res.json().catch(() => null)
       if (!res.ok) {
@@ -231,7 +256,7 @@ export default function VerifyLoginOtpPage() {
             <button
               type="button"
               className="btn btn-outline-secondary btn-sm"
-              onClick={requestOtp}
+              onClick={() => requestOtp(true)}
               disabled={requestLoading || verifyLoading}
             >
               {requestLoading ? 'Mengirim...' : 'Kirim ulang kode'}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { createNotificationsWithPush } from '@/lib/notification-push'
 
 // POST: gabung kelas via kode undangan
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -41,18 +42,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   })
   const user = await db.user.findUnique({ where: { id: session.user.id }, select: { name: true } })
 
-  await Promise.all(
-    admins.map((admin) =>
-      db.notification.create({
-        data: {
-          userId: admin.userId,
-          type: 'CLASS_JOIN',
-          title: 'Anggota baru bergabung',
-          message: `${user?.name} bergabung ke kelas "${group.name}".`,
-          link: `/kelas/${group.id}`,
-        },
-      }),
-    ),
+  await createNotificationsWithPush(
+    admins.map((admin) => admin.userId),
+    {
+      type: 'CLASS_JOIN',
+      title: 'Anggota baru bergabung',
+      message: `${user?.name} bergabung ke kelas "${group.name}".`,
+      link: `/kelas/${group.id}`,
+    },
+    { pushUrl: `/kelas/${group.id}` },
   )
 
   return NextResponse.json({ ok: true, groupId: group.id, groupName: group.name })

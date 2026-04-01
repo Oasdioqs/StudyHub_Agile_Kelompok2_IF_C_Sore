@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { createNotificationWithPush } from '@/lib/notification-push'
 
 // DELETE: komisaris keluarkan anggota dari kelas
 export async function DELETE(
@@ -29,15 +30,12 @@ export async function DELETE(
 
   // Notifikasi ke anggota yang dikeluarkan
   const group = await db.group.findUnique({ where: { id: params.id }, select: { name: true } })
-  await db.notification.create({
-    data: {
-      userId: params.memberId,
-      type: 'CLASS_KICKED',
-      title: `Kamu dikeluarkan dari kelas ${group?.name}`,
-      message: `Komisaris telah mengeluarkan kamu dari kelas "${group?.name}".`,
-      link: `/kelas`,
-    },
-  })
+  await createNotificationWithPush(params.memberId, {
+    type: 'CLASS_KICKED',
+    title: `Kamu dikeluarkan dari kelas ${group?.name}`,
+    message: `Komisaris telah mengeluarkan kamu dari kelas "${group?.name}".`,
+    link: `/kelas`,
+  }, '/kelas')
 
   return NextResponse.json({ ok: true })
 }

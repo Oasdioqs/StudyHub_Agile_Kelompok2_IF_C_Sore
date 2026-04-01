@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { createNotificationsWithPush } from '@/lib/notification-push'
 
 async function getAdminMembership(userId: string, groupId: string) {
   return db.groupMember.findFirst({ where: { userId, groupId, role: 'ADMIN' } })
@@ -53,15 +54,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     where: { groupId: params.id, NOT: { userId: session.user.id } },
   })
   if (members.length > 0) {
-    await db.notification.createMany({
-      data: members.map((m) => ({
-        userId: m.userId,
+    await createNotificationsWithPush(
+      members.map((m) => m.userId),
+      {
         type: 'CLASS_TASK_ADDED',
         title: `Tugas baru: ${group?.name}`,
-        message: `Komisaris menambahkan tugas "${task.title}"${task.deadline ? ` (deadline ${new Date(task.deadline).toLocaleDateString('id-ID')})` : ''}.`,
+        message: `Komisaris menambahkan tugas "${task.title}"${task.deadline ? ` (deadline ${new Date(task.deadline).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })})` : ''}.`,
         link: `/kelas/${params.id}`,
-      })),
-    })
+      },
+      { pushUrl: `/kelas/${params.id}` },
+    )
   }
 
   return NextResponse.json(task, { status: 201 })

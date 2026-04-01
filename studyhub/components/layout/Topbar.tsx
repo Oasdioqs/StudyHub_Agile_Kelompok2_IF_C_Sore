@@ -57,7 +57,12 @@ export default function Topbar() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotifs, setShowNotifs] = useState(false)
+  const [bellBounce, setBellBounce] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
+  const prevUnreadRef = useRef(0)
+  const notifBusyRef = useRef(false)
+  const notifIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const updateTaskFilter = (key: 'status' | 'priority', value: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -67,21 +72,50 @@ export default function Topbar() {
   }
 
   useEffect(() => {
-    const fetchNotifs = () => {
-      fetch('/api/notifications')
-        .then(res => res.json())
-        .then(data => {
-          if (data.notifications) {
-            setNotifications(data.notifications)
-            setUnreadCount(data.unreadCount || 0)
-          }
-        })
-        .catch(() => {})
+    const fetchNotifs = async (force = false) => {
+      if (notifBusyRef.current && !force) return
+      if (!force && typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      notifBusyRef.current = true
+      try {
+        const res = await fetch('/api/notifications', { cache: 'no-store' })
+        const data = await res.json().catch(() => null)
+        if (!res.ok || !data?.notifications) return
+        setNotifications(data.notifications)
+        const newCount = data.unreadCount || 0
+        if (newCount > prevUnreadRef.current) {
+          setBellBounce(true)
+          setTimeout(() => setBellBounce(false), 1500)
+        }
+        prevUnreadRef.current = newCount
+        setUnreadCount(newCount)
+      } finally {
+        notifBusyRef.current = false
+      }
     }
-    fetchNotifs()
-    // Poll setiap 30 detik agar pengumuman & notif baru langsung muncul
-    const interval = setInterval(fetchNotifs, 30000)
-    return () => clearInterval(interval)
+
+    void fetchNotifs(true)
+
+    // Real-time polling: 15s saat visible, 60s saat hidden
+    const startPolling = () => {
+      if (notifIntervalRef.current) clearInterval(notifIntervalRef.current)
+      const hidden = typeof document !== 'undefined' && document.visibilityState !== 'visible'
+      notifIntervalRef.current = setInterval(() => void fetchNotifs(), hidden ? 60_000 : 15_000)
+    }
+    startPolling()
+
+    const onVisible = () => {
+      void fetchNotifs()
+      startPolling() // restart dengan interval yg sesuai
+    }
+    const handleNewNotif = () => setTimeout(() => void fetchNotifs(true), 600)
+
+    window.addEventListener('studyhub:new-notification', handleNewNotif)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      if (notifIntervalRef.current) clearInterval(notifIntervalRef.current)
+      window.removeEventListener('studyhub:new-notification', handleNewNotif)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   useEffect(() => {
@@ -95,12 +129,40 @@ export default function Topbar() {
   }, [])
 
   const handleOpenNotifs = () => {
-    setShowNotifs(!showNotifs)
-    if (!showNotifs && unreadCount > 0) {
+    const opening = !showNotifs
+    setShowNotifs(opening)
+    if (opening && unreadCount > 0) {
       fetch('/api/notifications', { method: 'PATCH' }).catch(() => {})
       setUnreadCount(0)
+      prevUnreadRef.current = 0
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
     }
+  }
+
+  const handleDeleteNotif = async (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id))
+    await fetch('/api/notifications', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).catch(() => {})
+  }
+
+  const handleDeleteAll = async () => {
+    setDeletingAll(true)
+    await fetch('/api/notifications', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).catch(() => {})
+    setNotifications([])
+    setUnreadCount(0)
+    prevUnreadRef.current = 0
+    setDeletingAll(false)
+  }
+
+  const getNotifIcon = (type: string) => {
+    const map: Record<string, { icon: string; color: string }> = {
+      REMINDER: { icon: 'bi-alarm-fill', color: '#f59e0b' },
+      TASK: { icon: 'bi-check2-square', color: '#6366f1' },
+      CLASS: { icon: 'bi-people-fill', color: '#3b82f6' },
+      SCHEDULE: { icon: 'bi-calendar-check-fill', color: '#10b981' },
+      SYSTEM: { icon: 'bi-info-circle-fill', color: '#64748b' },
+      ANNOUNCEMENT: { icon: 'bi-megaphone-fill', color: '#ec4899' },
+    }
+    return map[type] ?? { icon: 'bi-bell-fill', color: '#6366f1' }
   }
 
   const searchLower = normalizeText(keyword.trim())
@@ -301,40 +363,138 @@ export default function Topbar() {
           <span className="topbar-btn-text-full">Tanya AI</span>
         </Link>
         <div className="position-relative" ref={notifRef}>
-          <button 
-            className="btn btn-sm topbar-icon-btn position-relative" 
+          <button
+            className={`btn btn-sm topbar-icon-btn position-relative${bellBounce ? ' bell-bounce' : ''}`}
             title="Notifikasi"
             onClick={handleOpenNotifs}
           >
-            <i className="bi bi-bell" style={{ fontSize: 17 }}></i>
+            <i className={`bi ${unreadCount > 0 ? 'bi-bell-fill' : 'bi-bell'}`} style={{ fontSize: 17 }} />
             {unreadCount > 0 && (
-              <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill border border-2 border-white" style={{ fontSize: 10, background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
+              <span
+                className="position-absolute top-0 start-100 translate-middle badge rounded-pill border border-2"
+                style={{ fontSize: 10, background: 'linear-gradient(135deg,#ef4444,#dc2626)', borderColor: 'var(--sh-card-bg) !important' }}
+              >
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </button>
+
+          <style>{`
+            @keyframes bellShake { 0%,100%{transform:rotate(0)} 20%{transform:rotate(14deg)} 40%{transform:rotate(-14deg)} 60%{transform:rotate(8deg)} 80%{transform:rotate(-8deg)} }
+            .bell-bounce i { animation: bellShake 0.6s ease 2; }
+            @keyframes notifSlideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+            .notif-popup { animation: notifSlideIn 0.18s ease; }
+            .notif-item:hover { background: var(--sh-hover) !important; }
+            .notif-item-del { opacity:0; transition: opacity 0.15s; }
+            .notif-item:hover .notif-item-del { opacity:1; }
+          `}</style>
+
           {showNotifs && (
-            <div className="dropdown-menu dropdown-menu-end show shadow-lg border-0" style={{ position: 'absolute', top: '100%', right: 0, width: 340, padding: 0, marginTop: '12px', maxHeight: '420px', overflowY: 'auto', borderRadius: '16px', backdropFilter: 'blur(12px)', background: 'var(--sh-card-bg)', zIndex: 1050 }}>
-              <div className="p-3 border-bottom d-flex justify-content-between align-items-center" style={{ background: 'rgba(59, 130, 246, 0.05)' }}>
-                <h6 className="mb-0 fw-bold d-flex align-items-center gap-2"><i className="bi bi-bell-fill text-primary"></i> Notifikasi</h6>
-                <button className="btn btn-sm btn-light py-0 px-2 rounded-pill" style={{ fontSize: '11px' }} onClick={() => setShowNotifs(false)}>Tutup</button>
-              </div>
-              {notifications.length === 0 ? (
-                <div className="p-5 text-center text-secondary small">
-                  <i className="bi bi-inbox-fill text-light d-block mb-3" style={{ fontSize: '3rem' }}></i>
-                  Belum ada aktivitas baru.
+            <div
+              className="notif-popup shadow-lg"
+              style={{
+                position: 'absolute', top: 'calc(100% + 10px)', right: 0,
+                width: 360, padding: 0, borderRadius: 18,
+                background: 'var(--sh-card-bg)',
+                border: '1px solid var(--sh-border)',
+                zIndex: 1050, overflow: 'hidden',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+              }}
+            >
+              {/* Header */}
+              <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid var(--sh-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="bi bi-bell-fill" style={{ color: '#6366f1', fontSize: 15 }} />
+                <span style={{ fontWeight: 700, fontSize: 15, flex: 1 }}>Notifikasi</span>
+                {unreadCount > 0 && (
+                  <span style={{ background: '#6366f1', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 999, padding: '2px 7px' }}>
+                    {unreadCount} baru
+                  </span>
+                )}
+                <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
+                  {notifications.length > 0 && (
+                    <button
+                      className="btn btn-sm"
+                      title="Hapus semua"
+                      style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
+                      onClick={handleDeleteAll}
+                      disabled={deletingAll}
+                    >
+                      {deletingAll ? <span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10 }} /> : <><i className="bi bi-trash3 me-1" />Hapus Semua</>}
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-sm"
+                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, color: 'var(--sh-muted)', border: '1px solid var(--sh-border)' }}
+                    onClick={() => setShowNotifs(false)}
+                  >
+                    ✕
+                  </button>
                 </div>
-              ) : (
-                <div className="list-group list-group-flush">
-                  {notifications.map((n) => (
-                    <div key={n.id} className={`list-group-item list-group-item-action p-3 border-bottom-0 border-top ${n.isRead ? '' : 'bg-primary bg-opacity-10'}`} onClick={() => { setShowNotifs(false); if (n.link) router.push(n.link); }} style={{ cursor: 'pointer', transition: 'background 0.2s ease' }}>
-                      <div className="d-flex w-100 justify-content-between mb-1 align-items-center">
-                        <strong className="small text-truncate me-2 fw-bold" style={{ color: 'var(--sh-text)' }}>{n.title}</strong>
-                        <span className="badge bg-light text-secondary rounded-pill" style={{ fontSize: '10px', fontWeight: 600 }}>{timeAgo(n.createdAt)}</span>
+              </div>
+
+              {/* Body */}
+              <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--sh-muted)' }}>
+                    <div style={{ fontSize: 44, marginBottom: 12 }}>🔔</div>
+                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Tidak ada notifikasi</div>
+                    <div style={{ fontSize: 12 }}>Semua aktivitas akan muncul di sini</div>
+                  </div>
+                ) : (
+                  notifications.map((n) => {
+                    let navLink = n.link || '/'
+                    if (navLink.startsWith('reminder:task:')) navLink = '/tasks'
+                    else if (navLink.startsWith('reminder:schedule:')) navLink = '/calendar'
+                    else if (navLink.startsWith('class-task-reminder:')) navLink = '/kelas'
+                    else if (navLink.startsWith('class-schedule-reminder:')) navLink = '/kelas'
+                    const { icon, color } = getNotifIcon(n.type)
+                    return (
+                      <div
+                        key={n.id}
+                        className="notif-item"
+                        style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 10,
+                          padding: '11px 14px',
+                          borderBottom: '1px solid var(--sh-border)',
+                          cursor: 'pointer',
+                          background: n.isRead ? 'transparent' : 'rgba(99,102,241,0.06)',
+                          position: 'relative',
+                        }}
+                        onClick={() => { setShowNotifs(false); router.push(navLink) }}
+                      >
+                        {/* Type icon */}
+                        <div style={{ width: 34, height: 34, borderRadius: 10, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <i className={`bi ${icon}`} style={{ color, fontSize: 15 }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--sh-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{n.title}</span>
+                            {!n.isRead && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366f1', flexShrink: 0 }} />}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.4, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{n.message}</div>
+                          <div style={{ fontSize: 11, color: 'var(--sh-muted)', opacity: 0.7 }}>{timeAgo(n.createdAt)}</div>
+                        </div>
+                        {/* Delete single */}
+                        <button
+                          className="notif-item-del btn btn-sm"
+                          style={{ padding: '2px 6px', borderRadius: 6, fontSize: 11, color: '#94a3b8', flexShrink: 0, position: 'absolute', top: 10, right: 10 }}
+                          onClick={(e) => { e.stopPropagation(); handleDeleteNotif(n.id) }}
+                          title="Hapus"
+                        >
+                          <i className="bi bi-x" />
+                        </button>
                       </div>
-                      <p className="mb-0 small text-secondary lh-sm" style={{ fontSize: '12px' }}>{n.message}</p>
-                    </div>
-                  ))}
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Footer */}
+              {notifications.length > 0 && (
+                <div style={{ padding: '8px 14px', borderTop: '1px solid var(--sh-border)', textAlign: 'center' }}>
+                  <Link href="/profile" style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none', fontWeight: 600 }} onClick={() => setShowNotifs(false)}>
+                    Lihat semua di Preferensi →
+                  </Link>
                 </div>
               )}
             </div>

@@ -35,17 +35,22 @@ messaging.onBackgroundMessage((payload) => {
 // Handle notification click
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const url = event.notification.data?.url || '/'
+  const rawUrl = event.notification.data?.url || '/'
+  // Resolve relative URL ke absolute
+  const fullUrl = rawUrl.startsWith('http') ? rawUrl : (self.location.origin + rawUrl)
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Coba focus window yang sudah ada
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
-          client.focus()
-          client.navigate(url)
-          return
+          return client.focus().then((c) => {
+            if (c && 'navigate' in c) c.navigate(fullUrl)
+            return c
+          })
         }
       }
-      return clients.openWindow(url)
+      // Buka window baru jika tidak ada
+      return clients.openWindow(fullUrl)
     })
   )
 })

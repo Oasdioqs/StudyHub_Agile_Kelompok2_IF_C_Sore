@@ -133,6 +133,8 @@ export default function TasksPageClient() {
   const searchParams = useSearchParams()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
+  const [syncStatus, setSyncStatus] = useState<'ok' | 'retrying' | 'error'>('ok')
+  const [syncMessage, setSyncMessage] = useState('')
   const [keyword, setKeyword] = useState('')
   const [viewFilter, setViewFilter] = useState<'forthcoming' | 'overdue' | 'completed'>('forthcoming')
   const [showModal, setShowModal] = useState(false)
@@ -142,6 +144,7 @@ export default function TasksPageClient() {
   const fetchTasks = async (withLoading = true) => {
     try {
       if (withLoading) setLoading(true)
+      setSyncStatus((prev) => (prev === 'error' ? 'retrying' : prev))
       const params = new URLSearchParams()
       if (keyword.trim()) params.set('q', keyword.trim())
       const { data } = await axios.get(`/api/tasks?${params}`)
@@ -155,8 +158,18 @@ export default function TasksPageClient() {
           )
         : data
       setTasks(filtered)
-    } catch {
-      setTasks([])
+      setSyncStatus('ok')
+      setSyncMessage('')
+    } catch (err: any) {
+      const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')
+      const msg = isTimeout
+        ? 'Koneksi timeout. Coba muat ulang beberapa detik lagi.'
+        : 'Gagal terhubung ke server. Coba muat ulang.'
+      setSyncStatus('error')
+      setSyncMessage(msg)
+      // On initial load, clear tasks so we show a proper error state.
+      // On background refresh, keep old tasks so user still sees data.
+      if (withLoading) setTasks([])
     } finally {
       if (withLoading) setLoading(false)
     }
@@ -180,7 +193,9 @@ export default function TasksPageClient() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    const { data } = await axios.post('/api/tasks', form)
+    // datetime-local gives "2026-04-01T23:59" tanpa timezone → append WIB offset
+    const deadlinePayload = form.deadline ? form.deadline + ':00+07:00' : undefined
+    const { data } = await axios.post('/api/tasks', { ...form, deadline: deadlinePayload })
     setTasks(prev => [data, ...prev])
     setSaving(false)
     setShowModal(false)
@@ -244,6 +259,21 @@ export default function TasksPageClient() {
             </button>
           </div>
 
+          {/* Error / sync banner */}
+          {syncStatus !== 'ok' && (
+            <div className={`alert mb-3 d-flex align-items-center justify-content-between gap-2 py-2 px-3 ${syncStatus === 'error' ? 'alert-danger' : 'alert-warning'}`} style={{ borderRadius: 10, fontSize: 13 }}>
+              <div className="d-flex align-items-center gap-2">
+                <i className={`bi ${syncStatus === 'error' ? 'bi-exclamation-triangle-fill' : 'bi-arrow-repeat'}`} />
+                <span>{syncStatus === 'retrying' ? 'Sinkronisasi ulang data tugas…' : syncMessage}</span>
+              </div>
+              {syncStatus === 'error' && (
+                <button className="btn btn-sm btn-outline-danger py-0 px-2" style={{ fontSize: 12, whiteSpace: 'nowrap' }} onClick={() => fetchTasks(true)}>
+                  Muat Ulang
+                </button>
+              )}
+            </div>
+          )}
+
           
           <div className="card mb-4">
             <div className="card-body py-3">
@@ -290,11 +320,29 @@ export default function TasksPageClient() {
             </div>
           ) : visibleTasks.length === 0 ? (
             <div className="text-center py-5 text-muted">
-              <i className="bi bi-inbox" style={{ fontSize: 48 }}></i>
-              <p className="mt-3 mb-2 fw-semibold">Tidak ada tugas untuk filter ini</p>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
-                Tambah Tugas Pertama
-              </button>
+              {syncStatus === 'error' ? (
+                <>
+                  <i className="bi bi-wifi-off" style={{ fontSize: 48, color: '#ef4444' }}></i>
+                  <p className="mt-3 mb-1 fw-bold" style={{ color: '#dc2626' }}>Data tidak berhasil dimuat</p>
+                  <p className="small mb-3" style={{ color: '#9a3412' }}>{syncMessage}</p>
+                  <button className="btn btn-danger btn-sm" onClick={() => fetchTasks(true)}>
+                    <i className="bi bi-arrow-clockwise me-1" />Coba Lagi
+                  </button>
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-inbox" style={{ fontSize: 48 }}></i>
+                  <p className="mt-3 mb-2 fw-semibold">Tidak ada tugas untuk filter ini</p>
+                  <div className="d-flex justify-content-center gap-2">
+                    <button className="btn btn-outline-secondary btn-sm" onClick={() => fetchTasks(true)}>
+                      Muat Ulang
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
+                      Tambah Tugas Pertama
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="d-flex flex-column gap-4 task-groups-root">

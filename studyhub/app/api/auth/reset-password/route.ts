@@ -11,6 +11,9 @@ export async function POST(req: Request) {
       { status: 400 }
     )
   }
+  if (String(password).length < 8) {
+    return NextResponse.json({ message: 'Password minimal 8 karakter' }, { status: 400 })
+  }
 
   const user = await db.user.findFirst({
     where: {

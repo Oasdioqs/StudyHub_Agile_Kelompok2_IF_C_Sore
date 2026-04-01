@@ -3,7 +3,10 @@ import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
 import { resendVerificationEmail } from '@/lib/mail'
 export async function POST(req: NextRequest) {
-  const { name, email, password } = await req.json()
+  const body = await req.json().catch(() => ({}))
+  const name = String((body as any).name || '').trim()
+  const email = String((body as any).email || '').trim().toLowerCase()
+  const password = String((body as any).password || '')
 
   if (!name || !email || !password) {
     return NextResponse.json({ message: 'Semua field wajib diisi' }, { status: 400 })
@@ -17,11 +20,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Email sudah digunakan' }, { status: 409 })
   }
 
-  const existingName = await db.user.findFirst({ where: { name } })
-  if (existingName) {
-    return NextResponse.json({ message: 'Nama sudah digunakan' }, { status: 409 })
-  }
-
   const hashed = await bcrypt.hash(password, 12)
   const user = await db.user.create({
     data: {
@@ -33,7 +31,18 @@ export async function POST(req: NextRequest) {
     select: { id: true, name: true, email: true },
   })
 
-  await resendVerificationEmail(user.email)
+  const sendResult = await resendVerificationEmail(user.email)
+  if ((sendResult as any)?.error) {
+    return NextResponse.json(
+      {
+        ...user,
+        warning:
+          (sendResult as any).error.message ||
+          'Akun berhasil dibuat, tapi email verifikasi belum berhasil dikirim. Coba kirim ulang dari halaman login.',
+      },
+      { status: 201 },
+    )
+  }
 
   return NextResponse.json(user, { status: 201 })
 }

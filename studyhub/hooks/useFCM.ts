@@ -8,7 +8,8 @@ import { requestAndRegisterToken, onForegroundMessage } from '@/lib/firebase-cli
  * Hook yang:
  * 1. Minta izin notifikasi saat user login
  * 2. Daftar FCM token ke server
- * 3. Handle foreground messages (tampil sebagai toast/notif in-app)
+ * 3. Handle foreground messages (tampil sebagai browser Notification)
+ * 4. Dispatch event agar bell badge langsung update saat FCM masuk
  */
 export function useFCM() {
   const { data: session, status } = useSession()
@@ -25,20 +26,46 @@ export function useFCM() {
     const timer = setTimeout(async () => {
       await requestAndRegisterToken()
 
-      // Listen foreground messages — tampilkan sebagai browser Notification
-      onForegroundMessage((payload) => {
+      // Listen foreground messages — tampilkan sebagai browser Notification via Service Worker
+      onForegroundMessage(async (payload) => {
         const title = payload.notification?.title || 'StudyHub'
         const body = payload.notification?.body || ''
+        const url = (payload as any).fcmOptions?.link || (payload as any).data?.url || '/'
         if (Notification.permission === 'granted') {
-          new Notification(title, {
-            body,
-            icon: '/icons/icon-192.png',
-            badge: '/icons/badge-72.png',
-          })
+          try {
+            const swReg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
+            if (swReg) {
+              swReg.showNotification(title, {
+                body,
+                icon: '/icons/icon-192.png',
+                badge: '/icons/badge-72.png',
+                data: { url },
+                tag: 'studyhub-fg-' + Date.now(),
+              } as NotificationOptions)
+            } else {
+              const n = new Notification(title, {
+                body,
+                icon: '/icons/icon-192.png',
+                badge: '/icons/badge-72.png',
+              })
+              n.onclick = () => {
+                window.focus()
+                window.location.href = url
+              }
+            }
+          } catch {
+            const n = new Notification(title, { body, icon: '/icons/icon-192.png' })
+            n.onclick = () => { window.focus(); window.location.href = url }
+          }
         }
-      })
-    }, 3000)
 
-    return () => clearTimeout(timer)
+        // ★ Dispatch event agar bell badge di Topbar langsung refresh
+        window.dispatchEvent(new CustomEvent('studyhub:new-notification'))
+      })
+    }, 2000)
+
+    return () => {
+      clearTimeout(timer)
+    }
   }, [status, session?.user?.id])
 }

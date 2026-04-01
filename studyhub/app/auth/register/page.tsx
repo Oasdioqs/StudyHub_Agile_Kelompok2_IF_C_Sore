@@ -79,8 +79,8 @@ export default function RegisterPage() {
 
     try {
       await axios.post('/api/auth/register', {
-        name: form.name,
-        email: form.email,
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
       })
 

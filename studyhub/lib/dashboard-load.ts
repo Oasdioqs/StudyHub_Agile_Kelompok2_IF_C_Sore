@@ -14,81 +14,95 @@ export async function loadDashboardStats(userId: string, options?: { skipReminde
   const { start: todayStart, end: todayEnd, now: jakartaNow } = getJakartaDayRange()
   const todayDow = getJakartaMondayFirstIndex()
 
-  // Ambil kelas yang diikuti user untuk ClassTask query
-  const groupIds = await db.groupMember
-    .findMany({ where: { userId }, select: { groupId: true } })
-    .then((rows) => rows.map((r) => r.groupId))
+  let _dbError = false
 
-  const [
-    todayPersonalTasks,
-    upcomingPersonalTasks,
-    doneTodayCount,
-    overdueTasks,
-    upcomingDueTasks,
-    completedLateToday,
-    recentNotes,
-    history,
-    todaySchedule,
-    todayClassTasks,
-    upcomingClassTasks,
-    latestNotifs,
-    unreadNotifs,
-  ] = await Promise.all([
-    // Personal tasks hari ini
-    db.task.findMany({
-      where: { userId, deadline: { gte: todayStart, lte: todayEnd } },
-      orderBy: [{ deadline: 'asc' }, { createdAt: 'desc' }],
-      select: { id: true, title: true, description: true, subject: true, deadline: true, priority: true, status: true, createdAt: true },
-    }),
-    // Personal tasks mendatang
-    db.task.findMany({
-      where: { userId, deadline: { gt: todayEnd } },
-      orderBy: { deadline: 'asc' },
-      take: 12,
-      select: { id: true, title: true, subject: true, deadline: true, priority: true, status: true },
-    }),
-    db.task.count({ where: { userId, status: 'DONE', deadline: { gte: todayStart, lte: todayEnd } } }),
-    db.task.count({ where: { userId, status: { not: 'DONE' }, deadline: { lt: jakartaNow } } }),
-    db.task.count({ where: { userId, status: { not: 'DONE' }, deadline: { gt: todayEnd } } }),
-    db.task.count({
-      where: { userId, status: 'DONE', deadline: { lt: todayStart }, updatedAt: { gte: todayStart, lte: todayEnd } },
-    }),
-    db.note.findMany({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-      take: 4,
-      select: { id: true, title: true, content: true },
-    }),
-    getDashboardHistory(userId),
-    findTodayScheduleForDashboard(userId, todayDow),
-    // Class tasks hari ini (semua kelas yang diikuti)
-    groupIds.length > 0
-      ? db.classTask.findMany({
+  // ── Phase 1: Personal tasks ──
+  let todayPersonalTasks: any[] = []
+  let upcomingPersonalTasks: any[] = []
+  let doneTodayCount = 0
+  let overdueTasks = 0
+  try {
+    ;[todayPersonalTasks, upcomingPersonalTasks, doneTodayCount, overdueTasks] = await Promise.all([
+      db.task.findMany({
+        where: { userId, deadline: { gte: todayStart, lte: todayEnd } },
+        orderBy: [{ deadline: 'asc' }, { createdAt: 'desc' }],
+        select: { id: true, title: true, description: true, subject: true, deadline: true, priority: true, status: true, createdAt: true },
+      }),
+      db.task.findMany({
+        where: { userId, deadline: { gt: todayEnd } },
+        orderBy: { deadline: 'asc' },
+        take: 12,
+        select: { id: true, title: true, subject: true, deadline: true, priority: true, status: true },
+      }),
+      db.task.count({ where: { userId, status: 'DONE', deadline: { gte: todayStart, lte: todayEnd } } }),
+      db.task.count({ where: { userId, status: { not: 'DONE' }, deadline: { lt: jakartaNow } } }),
+    ])
+  } catch { _dbError = true }
+
+  // ── Phase 2: Secondary data ──
+  let upcomingDueTasks = 0
+  let completedLateToday = 0
+  let recentNotes: any[] = []
+  let history: any[] = []
+  let todaySchedule: any[] = []
+  try {
+    ;[upcomingDueTasks, completedLateToday, recentNotes, history, todaySchedule] = await Promise.all([
+      db.task.count({ where: { userId, status: { not: 'DONE' }, deadline: { gt: todayEnd } } }),
+      db.task.count({
+        where: { userId, status: 'DONE', deadline: { lt: todayStart }, updatedAt: { gte: todayStart, lte: todayEnd } },
+      }),
+      db.note.findMany({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        take: 4,
+        select: { id: true, title: true, content: true },
+      }),
+      getDashboardHistory(userId),
+      findTodayScheduleForDashboard(userId, todayDow),
+    ])
+  } catch { _dbError = true }
+
+  // ── Phase 3: Notifications + class memberships ──
+  let latestNotifs: any[] = []
+  let unreadNotifs = 0
+  let groupMemberships: any[] = []
+  try {
+    ;[latestNotifs, unreadNotifs, groupMemberships] = await Promise.all([
+      db.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 8,
+        select: { id: true, type: true, title: true, message: true, isRead: true, createdAt: true },
+      }),
+      db.notification.count({ where: { userId, isRead: false } }),
+      db.groupMember.findMany({ where: { userId }, select: { groupId: true } }),
+    ])
+  } catch { _dbError = true }
+
+  const groupIds = groupMemberships.map((r) => r.groupId)
+
+  // ── Phase 4: Class tasks (hanya jika ada groupIds) — parallel ──
+  let todayClassTasks: any[] = []
+  let upcomingClassTasks: any[] = []
+  if (groupIds.length > 0) {
+    try {
+      ;[todayClassTasks, upcomingClassTasks] = await Promise.all([
+        db.classTask.findMany({
           where: { groupId: { in: groupIds }, deadline: { gte: todayStart, lte: todayEnd } },
           orderBy: { deadline: 'asc' },
           select: { id: true, title: true, description: true, groupId: true, deadline: true, priority: true, createdAt: true,
             group: { select: { name: true } } },
-        })
-      : Promise.resolve([]),
-    // Class tasks mendatang
-    groupIds.length > 0
-      ? db.classTask.findMany({
+        }),
+        db.classTask.findMany({
           where: { groupId: { in: groupIds }, deadline: { gt: todayEnd } },
           orderBy: { deadline: 'asc' },
           take: 8,
           select: { id: true, title: true, groupId: true, deadline: true, priority: true,
             group: { select: { name: true } } },
-        })
-      : Promise.resolve([]),
-    // Notifikasi — paralel
-    db.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 8,
-      select: { id: true, type: true, title: true, message: true, isRead: true, createdAt: true },
-    }),
-    db.notification.count({ where: { userId, isRead: false } }),
-  ])
+        }),
+      ])
+    } catch { _dbError = true }
+  }
 
   // Fire reminders secara non-blocking (tidak menghambat response)
   if (!options?.skipReminders) {
@@ -129,13 +143,14 @@ export async function loadDashboardStats(userId: string, options?: { skipReminde
   const progressPenaltyPercent = missedDeadlineCount > 0 ? 10 : 0
   const progress = calculateProgress(doneToday, totalToday, progressPenaltyPercent)
 
-  await saveDashboardDay(userId, getJakartaNowDate(), {
+  // Non-blocking save — jangan blokir response
+  void saveDashboardDay(userId, getJakartaNowDate(), {
     totalTasks: totalToday,
     doneTasks: doneToday,
     pendingTasks: todayPendingTasks,
     overdueTasks,
     progress,
-  })
+  }).catch(() => {})
 
   return {
     todayTasks,
@@ -156,5 +171,6 @@ export async function loadDashboardStats(userId: string, options?: { skipReminde
     unreadNotifs,
     history,
     todaySchedule,
+    _dbError,
   }
 }

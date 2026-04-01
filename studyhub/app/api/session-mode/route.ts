@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { createNotificationsWithPush } from '@/lib/notification-push'
 
 // GET: ambil mode sesi untuk slot+tanggal
 // Query: ?slotId=xxx&slotType=personal&date=2026-03-31
@@ -19,7 +20,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'slotId, slotType, date diperlukan' }, { status: 400 })
   }
 
-  const date = new Date(dateParam)
+  // Normalisasi tanggal: parse YYYY-MM-DD lalu buat local-midnight → UTC midnight
+  // HARUS konsisten dengan getSlotDate() di kelas schedule API
+  const [y, m, d] = dateParam.split('-').map(Number)
+  const date = new Date(y, m - 1, d, 0, 0, 0, 0)
   date.setUTCHours(0, 0, 0, 0)
 
   const record = await db.classSessionMode.findUnique({
@@ -51,8 +55,18 @@ export async function POST(req: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Hanya komisaris yang dapat mengatur mode kelas' }, { status: 403 })
   }
 
-  const normalizedDate = new Date(date)
-  normalizedDate.setUTCHours(0, 0, 0, 0)
+  const normalizedDate = (() => {
+    const str = typeof date === 'string' ? date : String(date)
+    const [y, m, d] = str.split('-').map(Number)
+    if (y && m && d) {
+      const dt = new Date(y, m - 1, d, 0, 0, 0, 0)
+      dt.setUTCHours(0, 0, 0, 0)
+      return dt
+    }
+    const dt = new Date(date)
+    dt.setUTCHours(0, 0, 0, 0)
+    return dt
+  })()
 
   if (mode === 'LANGSUNG') {
     // Jika ada note, simpan/update note di record yang ada — jangan hapus
@@ -81,15 +95,16 @@ export async function POST(req: NextRequest) {
         where: { groupId, NOT: { userId: session.user.id } },
       })
       if (members.length > 0) {
-        await db.notification.createMany({
-          data: members.map((m) => ({
-            userId: m.userId,
+        await createNotificationsWithPush(
+          members.map((m) => m.userId),
+          {
             type: 'CLASS_MODE_CHANGED',
             title: `Mode kuliah diperbarui — ${group?.name}`,
             message: `${slot?.title ?? 'Kuliah'} pada ${new Date(normalizedDate).toLocaleDateString('id-ID')} kembali ke Sinkron Langsung (Luring).`,
             link: `/kelas/${groupId}`,
-          })),
-        })
+          },
+          { pushUrl: `/kelas/${groupId}` },
+        )
       }
     }
 
@@ -119,15 +134,16 @@ export async function POST(req: NextRequest) {
       where: { groupId, NOT: { userId: session.user.id } },
     })
     if (members.length > 0) {
-      await db.notification.createMany({
-        data: members.map((m) => ({
-          userId: m.userId,
+      await createNotificationsWithPush(
+        members.map((m) => m.userId),
+        {
           type: 'CLASS_MODE_CHANGED',
           title: `Mode kuliah berubah — ${group?.name}`,
           message: `${slot?.title ?? 'Kuliah'} pada ${new Date(normalizedDate).toLocaleDateString('id-ID')} diganti ke Sinkron Maya (Daring).${note ? ` Catatan: ${note}` : ''}`,
           link: `/kelas/${groupId}`,
-        })),
-      })
+        },
+        { pushUrl: `/kelas/${groupId}` },
+      )
     }
   }
 

@@ -15,14 +15,15 @@ function sha256(input: string) {
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const { email, code } = body as { email?: string; code?: string }
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
 
   if (!code || typeof code !== 'string' || !/^\d{6}$/.test(code)) {
     return NextResponse.json({ message: 'Kode OTP tidak valid.' }, { status: 400 })
   }
 
   let userId: string | null = null
-  if (email) {
-    const user = await db.user.findUnique({ where: { email } })
+  if (normalizedEmail) {
+    const user = await db.user.findUnique({ where: { email: normalizedEmail } })
     if (!user) {
       return NextResponse.json({ message: 'User tidak ditemukan.' }, { status: 404 })
     }
@@ -67,18 +68,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Email kamu belum terverifikasi.' }, { status: 403 })
   }
 
+  const isProd = process.env.NODE_ENV === 'production'
   cookies().set(OTP_COOKIE_NAME, userId, {
     httpOnly: true,
-    sameSite: 'none',
-    secure: true,
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
     maxAge: 60 * 30,
     path: '/',
   })
 
   cookies().set(EMAIL_VERIFIED_COOKIE_NAME, userId, {
     httpOnly: true,
-    sameSite: 'none',
-    secure: true,
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
     maxAge: 60 * 30,
     path: '/',
   })

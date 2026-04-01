@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 export interface DashboardStats {
+  _dbError?: boolean
   todayTasks: {
     id: string
     title: string
@@ -59,54 +60,52 @@ export function useDashboardStream(initial: DashboardStats) {
   const [stats, setStats] = useState<DashboardStats>(initial)
   const [status, setStatus] = useState<Status>('connecting')
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(Date.now())
-  const esRef = useRef<EventSource | null>(null)
-  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [fetchError, setFetchError] = useState<boolean>(initial._dbError ?? false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const healthRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const attempt = useRef(0)
+  const busyRef = useRef(false)
 
-  const connect = () => {
-    esRef.current?.close()
-    if (retryRef.current) clearTimeout(retryRef.current)
-
-    const es = new EventSource('/api/dashboard/stream')
-    esRef.current = es
-
-    es.onopen = () => {
-      setStatus('live')
-      attempt.current = 0
-    }
-
-    es.onmessage = (e) => {
-      try {
-        const data: DashboardStats = JSON.parse(e.data)
+  const fetchOnce = async () => {
+    if (busyRef.current) return
+    busyRef.current = true
+    try {
+      const res = await fetch('/api/dashboard/stats', { cache: 'no-store' })
+      if (!res.ok) throw new Error('failed')
+      const data = (await res.json()) as DashboardStats & { _fetchError?: boolean }
+      if (data._fetchError) {
+        // Server got partial/no data — keep existing stats, flag the error
+        setFetchError(true)
+        setStatus((prev) => (prev === 'live' ? 'reconnecting' : 'offline'))
+      } else {
         setStats(data)
+        setFetchError(false)
         setStatus('live')
         setLastUpdatedAt(Date.now())
-      } catch {}
-    }
-
-    es.onerror = () => {
-      es.close()
-      esRef.current = null
-
-      attempt.current += 1
-      const delay = Math.min(1000 * Math.pow(2, attempt.current), 30_000)
-      setStatus(attempt.current <= 2 ? 'reconnecting' : 'offline')
-      retryRef.current = setTimeout(connect, delay)
+      }
+    } catch {
+      setFetchError(true)
+      setStatus((prev) => (prev === 'live' ? 'reconnecting' : 'offline'))
+    } finally {
+      busyRef.current = false
     }
   }
 
+  const refetch = () => { void fetchOnce() }
+
   useEffect(() => {
-    connect()
+    void fetchOnce()
+    pollRef.current = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      void fetchOnce()
+    }, 5 * 60_000)
 
     const onVisible = () => {
-      if (document.visibilityState === 'visible' && !esRef.current) connect()
+      if (document.visibilityState === 'visible') void fetchOnce()
     }
     document.addEventListener('visibilitychange', onVisible)
 
     return () => {
-      esRef.current?.close()
-      if (retryRef.current) clearTimeout(retryRef.current)
+      if (pollRef.current) clearInterval(pollRef.current)
       if (healthRef.current) clearInterval(healthRef.current)
       document.removeEventListener('visibilitychange', onVisible)
     }
@@ -116,9 +115,9 @@ export function useDashboardStream(initial: DashboardStats) {
     if (healthRef.current) clearInterval(healthRef.current)
     healthRef.current = setInterval(() => {
       const age = Date.now() - lastUpdatedAt
-      if (age > 12000 && age <= 30000) {
+      if (age > 60_000 && age <= 180_000) {
         setStatus((prev) => (prev === 'offline' ? prev : 'reconnecting'))
-      } else if (age > 30000) {
+      } else if (age > 180_000) {
         setStatus('offline')
       }
     }, 3000)
@@ -128,5 +127,5 @@ export function useDashboardStream(initial: DashboardStats) {
     }
   }, [lastUpdatedAt])
 
-  return { stats, status, lastUpdatedAt }
+  return { stats, status, lastUpdatedAt, fetchError, refetch }
 }

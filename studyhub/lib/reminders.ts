@@ -22,14 +22,15 @@ async function getGroupTokens(memberIds: string[]): Promise<string[]> {
 const ALL_INTERVALS = [1, 5, 10, 30, 60, 120] as const
 type Interval = typeof ALL_INTERVALS[number]
 
-// Window yang disesuaikan per interval agar tidak overlap
+// Window: sedikit lebih lebar dari heartbeat interval (2 menit) agar
+// setiap threshold hanya terpicu SEKALI, tidak berulang.
 const WINDOW_MS: Record<Interval, number> = {
-  1: 3 * 60 * 1000,       // ±3 menit untuk 1 menit
-  5: 5 * 60 * 1000,       // ±5 menit untuk 5 menit
-  10: 8 * 60 * 1000,      // ±8 menit untuk 10 menit
-  30: 12 * 60 * 1000,     // ±12 menit untuk 30 menit
-  60: 15 * 60 * 1000,     // ±15 menit untuk 1 jam
-  120: 22 * 60 * 1000,    // ±22 menit untuk 2 jam
+  1: 3 * 60 * 1000,       // ±3 menit
+  5: 3 * 60 * 1000,       // ±3 menit
+  10: 3 * 60 * 1000,      // ±3 menit
+  30: 4 * 60 * 1000,      // ±4 menit
+  60: 4 * 60 * 1000,      // ±4 menit
+  120: 4 * 60 * 1000,     // ±4 menit
 }
 
 function labelForInterval(minutesBefore: number): string {
@@ -110,26 +111,29 @@ export async function ensureRemindersForUser(
 
     for (const minutesBefore of personalScheduleIntervals) {
       if (!inReminderWindow(now, startAt, minutesBefore)) continue
-      const link = `reminder:schedule:${slot.id}:${ymdSchedule}:${minutesBefore}m`
-      if (await notificationExists(userId, link)) continue
+      const dedupKey = `reminder:schedule:${slot.id}:${ymdSchedule}:${minutesBefore}m`
+      if (await notificationExists(userId, dedupKey)) continue
       const notifMsg = `${slot.title} mulai pukul ${formatTimeLabel(slot.startTime)} WIB${slot.place ? ` · ${slot.place}` : ''}`
-      await db.notification.create({
-        data: {
-          userId,
-          type: 'schedule_reminder',
-          title: `Jadwal · ${labelForInterval(minutesBefore)}`,
-          message: notifMsg,
-          link,
-        },
-      })
-      // FCM push (fire-and-forget)
-      void getUserTokens(userId).then((tokens) =>
-        tokens.forEach((t) => sendPushToToken(t, {
-          title: `📅 Jadwal · ${labelForInterval(minutesBefore)}`,
-          body: notifMsg,
-          url: '/calendar',
-        }))
-      ).catch(() => {})
+      // Simpan notif — try-catch untuk race condition safety
+      try {
+        await db.notification.create({
+          data: {
+            userId,
+            type: 'schedule_reminder',
+            title: `📅 Jadwal · ${labelForInterval(minutesBefore)}`,
+            message: notifMsg,
+            link: dedupKey,
+          },
+        })
+        // FCM push (fire-and-forget) — hanya kirim jika create berhasil
+        void getUserTokens(userId).then((tokens) =>
+          tokens.forEach((t) => sendPushToToken(t, {
+            title: `📅 Jadwal · ${labelForInterval(minutesBefore)}`,
+            body: notifMsg,
+            url: '/calendar',
+          }))
+        ).catch(() => {})
+      } catch { /* dedup: sudah ada */ }
     }
   }
 
@@ -147,27 +151,29 @@ export async function ensureRemindersForUser(
     for (const minutesBefore of personalTaskIntervals) {
       if (!inReminderWindow(now, deadline, minutesBefore)) continue
       const ymd = formatJakartaYmd(deadline)
-      const link = `reminder:task:${task.id}:${ymd}:${minutesBefore}m`
-      if (await notificationExists(userId, link)) continue
+      const dedupKey = `reminder:task:${task.id}:${ymd}:${minutesBefore}m`
+      if (await notificationExists(userId, dedupKey)) continue
       const deadlineStr = deadline.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' })
       const notifMsg = `${task.title} — selesaikan sebelum ${deadlineStr} WIB`
-      await db.notification.create({
-        data: {
-          userId,
-          type: 'task_deadline_reminder',
-          title: `Deadline · ${labelForInterval(minutesBefore)}`,
-          message: notifMsg,
-          link,
-        },
-      })
-      // FCM push (fire-and-forget)
-      void getUserTokens(userId).then((tokens) =>
-        tokens.forEach((t) => sendPushToToken(t, {
-          title: `⏰ Deadline · ${labelForInterval(minutesBefore)}`,
-          body: notifMsg,
-          url: '/tasks',
-        }))
-      ).catch(() => {})
+      try {
+        await db.notification.create({
+          data: {
+            userId,
+            type: 'task_deadline_reminder',
+            title: `⏰ Deadline · ${labelForInterval(minutesBefore)}`,
+            message: notifMsg,
+            link: dedupKey,
+          },
+        })
+        // FCM push (fire-and-forget) — hanya kirim jika create berhasil
+        void getUserTokens(userId).then((tokens) =>
+          tokens.forEach((t) => sendPushToToken(t, {
+            title: `⏰ Deadline · ${labelForInterval(minutesBefore)}`,
+            body: notifMsg,
+            url: '/tasks',
+          }))
+        ).catch(() => {})
+      } catch { /* dedup: sudah ada */ }
     }
   }
 
@@ -221,37 +227,39 @@ async function ensureClassReminders(now: Date, groupIds: string[]) {
         // Cegah double send via ClassAnnouncement title sebagai dedup key
         if (await classReminderAnnouncementExists(groupId, dedupKey)) continue
 
-        // Simpan ke Pengumuman kelas
-        await db.classAnnouncement.create({
-          data: {
-            groupId,
-            title: dedupKey, // digunakan sebagai dedup key
-            message: `📚 Reminder Tugas · ${labelForInterval(minutesBefore)}\n\n**${task.title}** — deadline ${deadline.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' })} WIB`,
-            createdById: 'system',
-          },
-        })
-
-        // Kirim notif ke semua anggota
-        if (memberIds.length > 0) {
-          await db.notification.createMany({
-            data: memberIds.map((uid) => ({
-              userId: uid,
-              type: 'class_task_reminder',
-              title: `📚 [​${groupName}] Tugas · ${labelForInterval(minutesBefore)}`,
-              message: `${task.title} — deadline ${deadline.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' })} WIB`,
-              link: `/kelas/${groupId}?tab=announcements`,
-            })),
-            skipDuplicates: true,
+        try {
+          // Simpan ke Pengumuman kelas
+          await db.classAnnouncement.create({
+            data: {
+              groupId,
+              title: dedupKey, // digunakan sebagai dedup key
+              message: `📚 Reminder Tugas · ${labelForInterval(minutesBefore)}\n\n**${task.title}** — deadline ${deadline.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' })} WIB`,
+              createdById: 'system',
+            },
           })
-          // FCM push ke semua device anggota
-          void getGroupTokens(memberIds).then((tokens) =>
-            sendPushToTokens(tokens, {
-              title: `📚 [​${groupName}] Tugas · ${labelForInterval(minutesBefore)}`,
-              body: `${task.title} — deadline ${deadline.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' })} WIB`,
-              url: `/kelas/${groupId}?tab=announcements`,
+
+          // Kirim notif ke semua anggota
+          if (memberIds.length > 0) {
+            await db.notification.createMany({
+              data: memberIds.map((uid) => ({
+                userId: uid,
+                type: 'class_task_reminder',
+                title: `📚 [\u200B${groupName}] Tugas · ${labelForInterval(minutesBefore)}`,
+                message: `${task.title} — deadline ${deadline.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' })} WIB`,
+                link: `/kelas/${groupId}?tab=announcements`,
+              })),
+              skipDuplicates: true,
             })
-          ).catch(() => {})
-        }
+            // FCM push ke semua device anggota
+            void getGroupTokens(memberIds).then((tokens) =>
+              sendPushToTokens(tokens, {
+                title: `📚 [\u200B${groupName}] Tugas · ${labelForInterval(minutesBefore)}`,
+                body: `${task.title} — deadline ${deadline.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', dateStyle: 'short', timeStyle: 'short' })} WIB`,
+                url: `/kelas/${groupId}?tab=announcements`,
+              })
+            ).catch(() => {})
+          }
+        } catch { /* dedup: sudah ada */ }
       }
     }
 
@@ -278,35 +286,36 @@ async function ensureClassReminders(now: Date, groupIds: string[]) {
 
         if (await classReminderAnnouncementExists(groupId, dedupKey)) continue
 
-        await db.classAnnouncement.create({
-          data: {
-            groupId,
-            title: dedupKey,
-            message: `🏫 Reminder Jadwal · ${labelForInterval(minutesBefore)}\n\n**${slot.title}** mulai pukul ${formatTimeLabel(slot.startTime)} WIB${slot.place ? ` · ${slot.place}` : ''}`,
-            createdById: 'system',
-          },
-        })
-
-        if (memberIds.length > 0) {
-          await db.notification.createMany({
-            data: memberIds.map((uid) => ({
-              userId: uid,
-              type: 'class_schedule_reminder',
-              title: `🏫 [​${groupName}] Jadwal · ${labelForInterval(minutesBefore)}`,
-              message: `${slot.title} mulai pukul ${formatTimeLabel(slot.startTime)} WIB${slot.place ? ` · ${slot.place}` : ''}`,
-              link: `/kelas/${groupId}?tab=announcements`,
-            })),
-            skipDuplicates: true,
+        try {
+          await db.classAnnouncement.create({
+            data: {
+              groupId,
+              title: dedupKey,
+              message: `🏫 Reminder Jadwal · ${labelForInterval(minutesBefore)}\n\n**${slot.title}** mulai pukul ${formatTimeLabel(slot.startTime)} WIB${slot.place ? ` · ${slot.place}` : ''}`,
+              createdById: 'system',
+            },
           })
-          // FCM push ke semua device anggota
-          void getGroupTokens(memberIds).then((tokens) =>
-            sendPushToTokens(tokens, {
-              title: `🏫 [​${groupName}] Jadwal · ${labelForInterval(minutesBefore)}`,
-              body: `${slot.title} mulai pukul ${formatTimeLabel(slot.startTime)} WIB${slot.place ? ` · ${slot.place}` : ''}`,
-              url: `/kelas/${groupId}?tab=announcements`,
+
+          if (memberIds.length > 0) {
+            await db.notification.createMany({
+              data: memberIds.map((uid) => ({
+                userId: uid,
+                type: 'class_schedule_reminder',
+                title: `🏫 [\u200B${groupName}] Jadwal · ${labelForInterval(minutesBefore)}`,
+                message: `${slot.title} mulai pukul ${formatTimeLabel(slot.startTime)} WIB${slot.place ? ` · ${slot.place}` : ''}`,
+                link: `/kelas/${groupId}?tab=announcements`,
+              })),
+              skipDuplicates: true,
             })
-          ).catch(() => {})
-        }
+            void getGroupTokens(memberIds).then((tokens) =>
+              sendPushToTokens(tokens, {
+                title: `🏫 [\u200B${groupName}] Jadwal · ${labelForInterval(minutesBefore)}`,
+                body: `${slot.title} mulai pukul ${formatTimeLabel(slot.startTime)} WIB${slot.place ? ` · ${slot.place}` : ''}`,
+                url: `/kelas/${groupId}?tab=announcements`,
+              })
+            ).catch(() => {})
+          }
+        } catch { /* dedup: sudah ada */ }
       }
     }
   }

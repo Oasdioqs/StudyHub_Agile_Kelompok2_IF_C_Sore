@@ -52,7 +52,7 @@ function IntervalSelector({ selected, onChange, label }: {
 }
 
 export default function ProfilePage() {
-  const { data: session } = useSession()
+  const { data: session, update: updateSession } = useSession()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -171,10 +171,31 @@ export default function ProfilePage() {
           <div className="pf-hero">
             <div className="pf-avatar">{profile.image ? <img src={profile.image} alt={profile.name} /> : initials}</div>
             <div className="pf-hero-info">
-              <h1 className="pf-name">{profile.name}</h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <h1 className="pf-name" style={{ margin: 0 }}>{profile.name}</h1>
+                {(session?.user as any)?.isPremium && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    background: 'linear-gradient(135deg,#f59e0b,#f97316)',
+                    color: '#fff', fontSize: 11, fontWeight: 800,
+                    padding: '3px 10px', borderRadius: 999,
+                    boxShadow: '0 2px 8px rgba(245,158,11,0.4)',
+                    letterSpacing: '0.03em',
+                  }}>
+                    ⭐ PREMIUM
+                  </span>
+                )}
+              </div>
               <div className="pf-email"><i className="bi bi-envelope-fill me-1" />{profile.email}</div>
               {profile.institution && <div className="pf-sub"><i className="bi bi-building me-1" />{profile.institution}{profile.major && ` · ${profile.major}`}</div>}
               {profile.bio && <div className="pf-bio">{profile.bio}</div>}
+              {(session?.user as any)?.isPremium && (
+                <div style={{ marginTop: 8 }}>
+                  <a href="/upgrade" style={{ fontSize: 12, color: '#f59e0b', fontWeight: 600, textDecoration: 'none' }}>
+                    <i className="bi bi-star-fill me-1" />Kelola Langganan Premium
+                  </a>
+                </div>
+              )}
             </div>
           </div>
 

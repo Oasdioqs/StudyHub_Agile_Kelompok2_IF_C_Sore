@@ -893,13 +893,63 @@ export default function AITutorPageClient() {
       }
 
       const blocks: React.ReactNode[] = []
-      const renderInlineBold = (line: string, keyPrefixInline: string) => {
-        const pieces = line.split(/(\*\*[^*]+\*\*)/g)
-        return pieces.map((piece, idx) => {
-          const isBold = /^\*\*[^*]+\*\*$/.test(piece)
-          const text = isBold ? piece.slice(2, -2) : piece
-          return isBold ? <strong key={`${keyPrefixInline}-b-${idx}`}>{text}</strong> : <span key={`${keyPrefixInline}-t-${idx}`}>{text}</span>
-        })
+      const renderInlineFormatting = (line: string, keyPrefixInline: string) => {
+        // Parse bold (**text**) and links ([text](url))
+        const tokenRegex = /(\*\*[^*]+\*\*)|\[([^\]]+)\]\(([^)]+)\)/g
+        const result: React.ReactNode[] = []
+        let lastIdx = 0
+        let matchInline: RegExpExecArray | null
+        let partIdx = 0
+
+        while ((matchInline = tokenRegex.exec(line)) !== null) {
+          // Text before match
+          if (matchInline.index > lastIdx) {
+            result.push(<span key={`${keyPrefixInline}-t-${partIdx++}`}>{line.slice(lastIdx, matchInline.index)}</span>)
+          }
+
+          if (matchInline[1]) {
+            // Bold **text**
+            const boldText = matchInline[1].slice(2, -2)
+            result.push(<strong key={`${keyPrefixInline}-b-${partIdx++}`}>{boldText}</strong>)
+          } else if (matchInline[2] && matchInline[3]) {
+            // Link [text](url)
+            const linkText = matchInline[2]
+            const linkUrl = matchInline[3]
+            const isInternal = linkUrl.startsWith('/')
+            if (isInternal) {
+              result.push(
+                <a
+                  key={`${keyPrefixInline}-a-${partIdx++}`}
+                  href={linkUrl}
+                  onClick={(ev) => { ev.preventDefault(); router.push(linkUrl) }}
+                  className="ai-inline-link"
+                >
+                  {linkText}
+                </a>
+              )
+            } else {
+              result.push(
+                <a
+                  key={`${keyPrefixInline}-a-${partIdx++}`}
+                  href={linkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ai-inline-link external"
+                >
+                  {linkText} ↗
+                </a>
+              )
+            }
+          }
+          lastIdx = tokenRegex.lastIndex
+        }
+
+        // Remaining text
+        if (lastIdx < line.length) {
+          result.push(<span key={`${keyPrefixInline}-t-${partIdx++}`}>{line.slice(lastIdx)}</span>)
+        }
+
+        return result.length > 0 ? result : [<span key={`${keyPrefixInline}-raw`}>{line}</span>]
       }
       let i = 0
       while (i < lines.length) {
@@ -1136,30 +1186,30 @@ export default function AITutorPageClient() {
           continue
         }
         if (trimmed.startsWith('### ')) {
-          blocks.push(<h5 key={`${keyPrefix}-h3-${i}`} className="md-h3">{renderInlineBold(trimmed.slice(4), `${keyPrefix}-h3-${i}`)}</h5>)
+          blocks.push(<h5 key={`${keyPrefix}-h3-${i}`} className="md-h3">{renderInlineFormatting(trimmed.slice(4), `${keyPrefix}-h3-${i}`)}</h5>)
           i += 1
           continue
         }
         if (trimmed.startsWith('## ')) {
-          blocks.push(<h4 key={`${keyPrefix}-h2-${i}`} className="md-h2">{renderInlineBold(trimmed.slice(3), `${keyPrefix}-h2-${i}`)}</h4>)
+          blocks.push(<h4 key={`${keyPrefix}-h2-${i}`} className="md-h2">{renderInlineFormatting(trimmed.slice(3), `${keyPrefix}-h2-${i}`)}</h4>)
           i += 1
           continue
         }
         if (trimmed.startsWith('# ')) {
-          blocks.push(<h3 key={`${keyPrefix}-h1-${i}`} className="md-h1">{renderInlineBold(trimmed.slice(2), `${keyPrefix}-h1-${i}`)}</h3>)
+          blocks.push(<h3 key={`${keyPrefix}-h1-${i}`} className="md-h1">{renderInlineFormatting(trimmed.slice(2), `${keyPrefix}-h1-${i}`)}</h3>)
           i += 1
           continue
         }
         if (/^[-*]\s+/.test(trimmed)) {
           blocks.push(
             <div key={`${keyPrefix}-li-${i}`} className="md-li">
-              {renderInlineBold(trimmed.replace(/^[-*]\s+/, '• '), `${keyPrefix}-li-${i}`)}
+              {renderInlineFormatting(trimmed.replace(/^[-*]\s+/, '• '), `${keyPrefix}-li-${i}`)}
             </div>,
           )
           i += 1
           continue
         }
-        blocks.push(<div key={`${keyPrefix}-p-${i}`} className="md-p">{renderInlineBold(line, `${keyPrefix}-p-${i}`)}</div>)
+        blocks.push(<div key={`${keyPrefix}-p-${i}`} className="md-p">{renderInlineFormatting(line, `${keyPrefix}-p-${i}`)}</div>)
         i += 1
       }
 
@@ -2356,6 +2406,52 @@ export default function AITutorPageClient() {
         }
         .md-spacer {
           height: 8px;
+        }
+        .ai-inline-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 2px;
+          color: #4f46e5;
+          background: rgba(79, 70, 229, 0.08);
+          padding: 2px 10px;
+          border-radius: 999px;
+          font-weight: 600;
+          font-size: 12.5px;
+          text-decoration: none;
+          cursor: pointer;
+          transition: all 0.18s ease;
+          border: 1px solid rgba(79, 70, 229, 0.15);
+        }
+        .ai-inline-link:hover {
+          background: rgba(79, 70, 229, 0.16);
+          color: #3730a3;
+          border-color: rgba(79, 70, 229, 0.3);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+        }
+        .ai-inline-link.external {
+          color: #0284c7;
+          background: rgba(2, 132, 199, 0.08);
+          border-color: rgba(2, 132, 199, 0.15);
+        }
+        .ai-inline-link.external:hover {
+          background: rgba(2, 132, 199, 0.16);
+          color: #0369a1;
+          border-color: rgba(2, 132, 199, 0.3);
+        }
+        :root[data-theme='dark'] .ai-inline-link {
+          color: #a5b4fc;
+          background: rgba(165, 180, 252, 0.12);
+          border-color: rgba(165, 180, 252, 0.2);
+        }
+        :root[data-theme='dark'] .ai-inline-link:hover {
+          background: rgba(165, 180, 252, 0.22);
+          color: #c7d2fe;
+        }
+        :root[data-theme='dark'] .ai-inline-link.external {
+          color: #7dd3fc;
+          background: rgba(125, 211, 252, 0.12);
+          border-color: rgba(125, 211, 252, 0.2);
         }
         .assistant-table-wrap {
           margin: 4px 0 2px;

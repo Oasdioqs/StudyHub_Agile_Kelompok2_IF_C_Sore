@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth'
 const OTP_COOKIE_RATE_LIMIT_MS = 60 * 1000
 const OTP_EXPIRES_MS = 10 * 60 * 1000
 const EMAIL_SEND_TIMEOUT_MS = 8000
+const DB_OP_TIMEOUT_MS = 5000
 
 function generateOtp() {
   const num = Math.floor(Math.random() * 1_000_000)
@@ -32,138 +33,166 @@ async function sendWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promi
   return result as { timedOut: boolean; result?: T }
 }
 
+function isDbPoolError(err: unknown) {
+  const msg = String((err as any)?.message || err || '')
+  return (
+    /Timed out fetching a new connection from the connection pool/i.test(msg) ||
+    /Unable to check out connection from the pool/i.test(msg) ||
+    /Error in PostgreSQL connection: Error \{ kind: Closed/i.test(msg)
+  )
+}
+
+async function dbWithTimeout<T>(promise: Promise<T>) {
+  const result = await sendWithTimeout(promise, DB_OP_TIMEOUT_MS)
+  if (result.timedOut) throw new Error('DB_TIMEOUT')
+  return result.result as T
+}
+
+async function resendVerificationEmailFast(email: string) {
+  const result = await sendWithTimeout(resendVerificationEmail(email), EMAIL_SEND_TIMEOUT_MS)
+  if (result.timedOut) {
+    return { timedOut: true, error: null as string | null }
+  }
+  const err = (result.result as any)?.error
+  return { timedOut: false, error: err?.message || null }
+}
+
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}))
-  const { email, password } = body as { email?: string; password?: string }
-
-  let userId: string | null = null
-  let userEmail: string | null = null
-  let provider: string = 'credentials'
-
-  if (typeof password === 'string') {
-    if (!email) {
-      return NextResponse.json({ message: 'Email wajib diisi.' }, { status: 400 })
+  try {
+    const lastOtpAtCookie = Number(req.cookies.get('otp_rl')?.value || '0')
+    if (lastOtpAtCookie && Date.now() - lastOtpAtCookie < OTP_COOKIE_RATE_LIMIT_MS) {
+      const waitSec = Math.ceil((OTP_COOKIE_RATE_LIMIT_MS - (Date.now() - lastOtpAtCookie)) / 1000)
+      return NextResponse.json({ message: `Tunggu ${waitSec} detik sebelum kirim OTP lagi.` }, { status: 429 })
     }
 
-    const user = await db.user.findUnique({ where: { email } })
-    if (!user || !user.password) {
-      return NextResponse.json({ message: 'Email atau password salah.' }, { status: 401 })
-    }
+    const body = await req.json().catch(() => ({}))
+    const { email, password } = body as { email?: string; password?: string }
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
 
-    const ok = await bcrypt.compare(password, user.password)
-    if (!ok) {
-      return NextResponse.json({ message: 'Email atau password salah.' }, { status: 401 })
-    }
+    let userId: string | null = null
+    let userEmail: string | null = null
+    let provider: string = 'credentials'
 
-    if (!user.emailVerified) {
-      const sendResult = await resendVerificationEmail(user.email)
-      if ((sendResult as any)?.error) {
-        return NextResponse.json(
-          { message: (sendResult as any).error.message || 'Email belum terverifikasi dan gagal kirim ulang link verifikasi.' },
-          { status: 500 },
-        )
-      }
-      return NextResponse.json(
-        { message: 'Email kamu belum terverifikasi. Link verifikasi sudah kami kirim ulang.' },
-        { status: 403 },
-      )
-    }
-
-    userId = user.id
-    userEmail = user.email
-    provider = 'credentials'
-  } else {
-    const user =
-      typeof email === 'string' && email
-        ? await db.user.findUnique({ where: { email } })
-        : null
-
-    if (!user) {
-      const session = await getServerSession(authOptions)
-      const sessionUserId = session?.user?.id
-      if (!sessionUserId) {
-        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    if (typeof password === 'string') {
+      if (!normalizedEmail) {
+        return NextResponse.json({ message: 'Email wajib diisi.' }, { status: 400 })
       }
 
-      const sessionUser = await db.user.findUnique({ where: { id: sessionUserId } })
-      if (!sessionUser) {
-        return NextResponse.json({ message: 'User tidak ditemukan.' }, { status: 404 })
+      const user = await dbWithTimeout(db.user.findUnique({ where: { email: normalizedEmail } }))
+      if (!user || !user.password) {
+        return NextResponse.json({ message: 'Email atau password salah.' }, { status: 401 })
       }
 
-      if (!sessionUser.emailVerified) {
-        const sendResult = await resendVerificationEmail(sessionUser.email)
-        if ((sendResult as any)?.error) {
-          return NextResponse.json(
-            { message: (sendResult as any).error.message || 'Email belum terverifikasi dan gagal kirim ulang link verifikasi.' },
-            { status: 500 },
-          )
-        }
-        return NextResponse.json(
-          { message: 'Email kamu belum terverifikasi. Link verifikasi sudah kami kirim ulang.' },
-          { status: 403 },
-        )
+      const ok = await bcrypt.compare(password, user.password)
+      if (!ok) {
+        return NextResponse.json({ message: 'Email atau password salah.' }, { status: 401 })
       }
 
-      userId = sessionUser.id
-      userEmail = sessionUser.email
-      provider = 'google'
-    } else {
       if (!user.emailVerified) {
-        const sendResult = await resendVerificationEmail(user.email)
-        if ((sendResult as any)?.error) {
+        const sendResult = await resendVerificationEmailFast(user.email)
+        if (sendResult.error) {
           return NextResponse.json(
-            { message: (sendResult as any).error.message || 'Email belum terverifikasi dan gagal kirim ulang link verifikasi.' },
+            { message: sendResult.error || 'Email belum terverifikasi dan gagal kirim ulang link verifikasi.' },
             { status: 500 },
           )
         }
         return NextResponse.json(
-          { message: 'Email kamu belum terverifikasi. Link verifikasi sudah kami kirim ulang.' },
+          {
+            message: sendResult.timedOut
+              ? 'Email belum terverifikasi. Pengiriman link verifikasi sedang diproses, coba cek inbox beberapa saat lagi.'
+              : 'Email kamu belum terverifikasi. Link verifikasi sudah kami kirim ulang.',
+          },
           { status: 403 },
         )
       }
 
       userId = user.id
       userEmail = user.email
-      provider = 'google'
+      provider = 'credentials'
+    } else {
+      const user =
+        normalizedEmail
+          ? await dbWithTimeout(db.user.findUnique({ where: { email: normalizedEmail } }))
+          : null
+
+      if (!user) {
+        const session = await getServerSession(authOptions)
+        const sessionUserId = session?.user?.id
+        if (!sessionUserId) {
+          return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        }
+
+        const sessionUser = await dbWithTimeout(db.user.findUnique({ where: { id: sessionUserId } }))
+        if (!sessionUser) {
+          return NextResponse.json({ message: 'User tidak ditemukan.' }, { status: 404 })
+        }
+
+        if (!sessionUser.emailVerified) {
+          const sendResult = await resendVerificationEmailFast(sessionUser.email)
+          if (sendResult.error) {
+            return NextResponse.json(
+              { message: sendResult.error || 'Email belum terverifikasi dan gagal kirim ulang link verifikasi.' },
+              { status: 500 },
+            )
+          }
+          return NextResponse.json(
+            {
+              message: sendResult.timedOut
+                ? 'Email belum terverifikasi. Pengiriman link verifikasi sedang diproses, coba cek inbox beberapa saat lagi.'
+                : 'Email kamu belum terverifikasi. Link verifikasi sudah kami kirim ulang.',
+            },
+            { status: 403 },
+          )
+        }
+
+        userId = sessionUser.id
+        userEmail = sessionUser.email
+        provider = 'google'
+      } else {
+        if (!user.emailVerified) {
+          const sendResult = await resendVerificationEmailFast(user.email)
+          if (sendResult.error) {
+            return NextResponse.json(
+              { message: sendResult.error || 'Email belum terverifikasi dan gagal kirim ulang link verifikasi.' },
+              { status: 500 },
+            )
+          }
+          return NextResponse.json(
+            {
+              message: sendResult.timedOut
+                ? 'Email belum terverifikasi. Pengiriman link verifikasi sedang diproses, coba cek inbox beberapa saat lagi.'
+                : 'Email kamu belum terverifikasi. Link verifikasi sudah kami kirim ulang.',
+            },
+            { status: 403 },
+          )
+        }
+
+        userId = user.id
+        userEmail = user.email
+        provider = 'google'
+      }
     }
 
-  }
-
-  if (!userId || !userEmail) {
-    return NextResponse.json({ message: 'Gagal menentukan user.' }, { status: 400 })
-  }
-
-  const lastActive = await db.loginOtp.findFirst({
-    where: { userId, usedAt: null },
-    orderBy: { lastSentAt: 'desc' },
-  })
-
-  if (lastActive) {
-    const age = Date.now() - lastActive.lastSentAt.getTime()
-    if (age < OTP_COOKIE_RATE_LIMIT_MS) {
-      return NextResponse.json(
-        { message: `Tunggu ${Math.ceil((OTP_COOKIE_RATE_LIMIT_MS - age) / 1000)} detik sebelum kirim OTP lagi.` },
-        { status: 429 },
-      )
+    if (!userId || !userEmail) {
+      return NextResponse.json({ message: 'Gagal menentukan user.' }, { status: 400 })
     }
-  }
 
-  const otp = generateOtp()
-  const expiresAt = new Date(Date.now() + OTP_EXPIRES_MS)
-  const codeHash = sha256(otp)
+    const otp = generateOtp()
+    const expiresAt = new Date(Date.now() + OTP_EXPIRES_MS)
+    const codeHash = sha256(otp)
 
-  await db.loginOtp.create({
-    data: {
-      userId,
-      codeHash,
-      expiresAt,
-      usedAt: null,
-      provider,
-      lastSentAt: new Date(),
-    },
-  })
+    await dbWithTimeout(db.loginOtp.create({
+      data: {
+        userId,
+        codeHash,
+        expiresAt,
+        usedAt: null,
+        provider,
+        lastSentAt: new Date(),
+      },
+    }))
 
-  const sendResult = await sendWithTimeout(sendEmail({
+    const sendResult = await sendWithTimeout(sendEmail({
     to: userEmail,
     subject: 'Login Verification Code - StudyHub',
     html: `
@@ -210,16 +239,41 @@ export async function POST(req: NextRequest) {
         </body>
       </html>
     `
-  }), EMAIL_SEND_TIMEOUT_MS)
+    }), EMAIL_SEND_TIMEOUT_MS)
 
-  if (sendResult.timedOut) {
-    return NextResponse.json({ message: 'OTP sedang diproses pengirimannya. Cek email dalam beberapa detik.' })
+    if (sendResult.timedOut) {
+      const res = NextResponse.json({ message: 'OTP sedang diproses pengirimannya. Cek email dalam beberapa detik.' })
+      res.cookies.set('otp_rl', String(Date.now()), {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60,
+        path: '/',
+      })
+      return res
+    }
+
+    const sendError = (sendResult.result as any)?.error
+    if (sendError) {
+      return NextResponse.json({ message: sendError.message || 'Gagal mengirim OTP. Coba lagi.' }, { status: 500 })
+    }
+
+    const res = NextResponse.json({ message: 'OTP berhasil dikirim ke email kamu.' })
+    res.cookies.set('otp_rl', String(Date.now()), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60,
+      path: '/',
+    })
+    return res
+  } catch (err) {
+    if (String((err as any)?.message || '') === 'DB_TIMEOUT' || isDbPoolError(err)) {
+      return NextResponse.json(
+        { message: 'Server lagi ramai. Coba kirim OTP lagi dalam 10-20 detik.' },
+        { status: 503 },
+      )
+    }
+    return NextResponse.json({ message: 'Gagal mengirim OTP. Coba lagi.' }, { status: 500 })
   }
-
-  const sendError = (sendResult.result as any)?.error
-  if (sendError) {
-    return NextResponse.json({ message: sendError.message || 'Gagal mengirim OTP. Coba lagi.' }, { status: 500 })
-  }
-
-  return NextResponse.json({ message: 'OTP berhasil dikirim ke email kamu.' })
 }

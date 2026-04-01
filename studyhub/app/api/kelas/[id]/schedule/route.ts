@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { createNotificationsWithPush } from '@/lib/notification-push'
 
 async function getAdminMembership(userId: string, groupId: string) {
   return db.groupMember.findFirst({ where: { userId, groupId, role: 'ADMIN' } })
@@ -11,23 +12,29 @@ async function getMembership(userId: string, groupId: string) {
 }
 
 /**
- * Hitung tanggal konkret minggu ini untuk slot tertentu berdasarkan dayOfWeek.
- * dayOfWeek: 0=Minggu, 1=Senin, 2=Selasa, ..., 6=Sabtu (sama seperti JS getUTCDay)
- * Sehingga Senin minggu ini = today - today.getUTCDay() + 1, dst.
+ * Hitung tanggal lokal minggu ini untuk slot tertentu berdasarkan dayOfWeek.
+ * PENTING: dayOfWeek mengikuti konvensi Monday-first dari halaman kelas:
+ * 0=Senin, 1=Selasa, 2=Rabu, 3=Kamis, 4=Jumat, 5=Sabtu, 6=Minggu
  */
 function getSlotDate(dayOfWeek: number): Date {
   const today = new Date()
-  const todayUTCDay = today.getUTCDay() // 0=Sun, 1=Mon, ...
-  // Hitung offset dari hari ini ke dayOfWeek pada minggu yang sama
-  // Gunakan Senin sebagai awal minggu
-  const diffToMonday = todayUTCDay === 0 ? -6 : 1 - todayUTCDay
-  const mondayMs = Date.UTC(
-    today.getUTCFullYear(), today.getUTCMonth(),
-    today.getUTCDate() + diffToMonday
+  const todayLocalDay = today.getDay() // 0=Sun, 1=Mon, ..., 6=Sat (JS convention)
+  // Offset dari hari ini ke Senin minggu ini
+  const diffToMonday = todayLocalDay === 0 ? -6 : 1 - todayLocalDay
+  // Senin minggu ini dalam local time
+  const monday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() + diffToMonday,
+    0, 0, 0, 0
   )
-  // Offset dari Senin: Senin=0, Selasa=1, ..., Minggu=6
-  const offsetFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-  return new Date(mondayMs + offsetFromMonday * 86400000)
+  // dayOfWeek sudah Monday-first: 0=Senin, 1=Selasa, ..., 6=Minggu
+  // Jadi offset dari Senin = dayOfWeek langsung
+  const result = new Date(monday)
+  result.setDate(monday.getDate() + dayOfWeek)
+  // Set jam ke UTC midnight agar cocok dengan format DB (Prisma DateTime)
+  result.setUTCHours(0, 0, 0, 0)
+  return result
 }
 
 // GET: jadwal kelas
@@ -124,15 +131,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       where: { groupId: params.id, NOT: { userId: session.user.id } },
     })
     if (members.length > 0) {
-      await db.notification.createMany({
-        data: members.map((m) => ({
-          userId: m.userId,
+      await createNotificationsWithPush(
+        members.map((m) => m.userId),
+        {
           type: 'CLASS_SCHEDULE_UPDATED',
           title: `Mode kelas diperbarui: ${group?.name}`,
           message: `Komisaris mengubah mode kuliah minggu ini menjadi ${modeValue === 'MAYA' ? 'Sinkron Maya (Online)' : 'Langsung (Tatap Muka)'}.`,
           link: `/kelas/${params.id}`,
-        })),
-      })
+        },
+        { pushUrl: `/kelas/${params.id}` },
+      )
     }
 
     // Kembalikan jadwal dengan mode terbaru (baca dari DB — semua slot)

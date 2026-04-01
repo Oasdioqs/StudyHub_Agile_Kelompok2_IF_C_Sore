@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserIdFromRequest } from '@/lib/api-session'
 import { db } from '@/lib/db'
+import { createNotificationWithPush } from '@/lib/notification-push'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const userId = await getUserIdFromRequest(req)
@@ -43,16 +44,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         where: { id: userId },
         data: { points: { increment: 10 } },
       }),
-      db.notification.create({
-        data: {
-          userId,
-          type: completedLate ? 'TASK_COMPLETED_LATE' : 'TASK_COMPLETED',
-          title: notifTitle,
-          message: notifMessage,
-          link: '/tasks',
-        },
-      }),
     ])
+    await createNotificationWithPush(userId, {
+      type: completedLate ? 'TASK_COMPLETED_LATE' : 'TASK_COMPLETED',
+      title: notifTitle,
+      message: notifMessage,
+      link: '/tasks',
+    })
     updated = taskUpdated
   } else {
     updated = await db.task.update({

@@ -161,7 +161,7 @@ export default function DashboardClient({
   firstName: string
   today: string
 }) {
-  const { stats, status, lastUpdatedAt } = useDashboardStream(initial)
+  const { stats, status, lastUpdatedAt, fetchError, refetch } = useDashboardStream(initial)
   const {
     todayTasks,
     upcomingTasks,
@@ -370,7 +370,50 @@ export default function DashboardClient({
       }}
     >
 
-      
+      {/* ── Error / Stale-data banner ── */}
+      {(fetchError || status === 'offline') && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          background: isDark ? 'rgba(239,68,68,0.12)' : '#fff7ed',
+          border: `1px solid ${isDark ? 'rgba(239,68,68,0.35)' : '#fed7aa'}`,
+          borderRadius: 12,
+          padding: '12px 16px',
+          marginBottom: 14,
+          flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 18 }}>⚠️</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#fca5a5' : '#9a3412' }}>
+                Gagal memuat data terbaru
+              </div>
+              <div style={{ fontSize: 12, color: isDark ? '#fbd5b5' : '#c2410c', marginTop: 2 }}>
+                Data yang ditampilkan mungkin belum diperbarui. Koneksi ke database bermasalah.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={refetch}
+            style={{
+              border: `1px solid ${isDark ? 'rgba(239,68,68,0.5)' : '#fb923c'}`,
+              background: isDark ? 'rgba(239,68,68,0.18)' : '#fff',
+              color: isDark ? '#fca5a5' : '#9a3412',
+              borderRadius: 8,
+              padding: '7px 14px',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            🔄 Coba Lagi
+          </button>
+        </div>
+      )}
+
       <div style={{ background: '#1a1a2e', borderRadius: 20, padding: '28px 28px 24px', position: 'relative', overflow: 'hidden', marginBottom: 20, color: '#fff' }}>
         <div style={{ position: 'absolute', width: 220, height: 220, borderRadius: '50%', background: 'radial-gradient(circle,rgba(108,99,255,0.35),transparent)', top: -80, right: -40, pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', width: 150, height: 150, borderRadius: '50%', background: 'radial-gradient(circle,rgba(245,158,11,0.2),transparent)', bottom: -60, right: 60, pointerEvents: 'none' }} />

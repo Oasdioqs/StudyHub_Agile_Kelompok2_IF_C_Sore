@@ -61,27 +61,38 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     },
   })
 
-  // 3. FCM push notification ke semua anggota
-  if (memberIds.length > 0) {
-    try {
-      const fcmTokens = await db.fcmToken.findMany({
-        where: { userId: { in: memberIds } },
-        select: { token: true },
+  // 3. FCM push notification ke SEMUA anggota + komisaris sendiri
+  let fcmTokenCount = 0
+  let fcmResult: string = 'skipped'
+  try {
+    // Sertakan komisaris sendiri supaya dia juga dapat push (berguna untuk testing)
+    const allRecipientIds = [...memberIds, session.user.id]
+    const fcmTokens = await db.fcmToken.findMany({
+      where: { userId: { in: allRecipientIds } },
+      select: { token: true, userId: true },
+    })
+    fcmTokenCount = fcmTokens.length
+    const tokens = fcmTokens.map((t) => t.token)
+
+    console.log(`[FCM] Announce: ${allRecipientIds.length} recipients, ${fcmTokenCount} FCM tokens found`)
+    
+    if (tokens.length > 0) {
+      await sendPushToTokens(tokens, {
+        title: `📢 ${title.trim()} — ${group?.name}`,
+        body: message.trim().length > 100 ? message.trim().slice(0, 97) + '…' : message.trim(),
+        url: `/kelas/${params.id}?tab=announcements`,
       })
-      const tokens = fcmTokens.map((t) => t.token)
-      if (tokens.length > 0) {
-        await sendPushToTokens(tokens, {
-          title: `📢 ${title.trim()} — ${group?.name}`,
-          body: message.trim().length > 100 ? message.trim().slice(0, 97) + '…' : message.trim(),
-          url: `/kelas/${params.id}?tab=announcements`,
-        })
-      }
-    } catch (err) {
-      console.error('[FCM] Announce push error:', err)
+      fcmResult = `sent to ${tokens.length} devices`
+    } else {
+      fcmResult = 'no FCM tokens found for any member'
+      console.warn('[FCM] Announce: no FCM tokens found for recipients:', allRecipientIds)
     }
+  } catch (err) {
+    fcmResult = `error: ${err instanceof Error ? err.message : String(err)}`
+    console.error('[FCM] Announce push error:', err)
   }
 
-  return NextResponse.json({ ok: true, sent: memberIds.length, announcement })
+  return NextResponse.json({ ok: true, sent: memberIds.length, fcmTokenCount, fcmResult, announcement })
 }
 
 // DELETE: komisaris hapus pengumuman

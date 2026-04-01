@@ -228,11 +228,31 @@ export default function CalendarPage() {
     return { today, week, overdue }
   }, [tasks, todayKey])
 
+  // Pisahkan slot personal vs kelas
+  const personalSlots = useMemo(() => scheduleSlots.filter(s => !s.groupId), [scheduleSlots])
+  const classSlots = useMemo(() => scheduleSlots.filter(s => !!s.groupId), [scheduleSlots])
+
+  // Class slots grouped by day untuk tampilan read-only di modal
+  const classSlotsByDay = useMemo(() => {
+    const out: Record<number, ScheduleSlot[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }
+    for (const s of classSlots) {
+      if (s.dayOfWeek >= 0 && s.dayOfWeek <= 6) out[s.dayOfWeek].push(s)
+    }
+    return out
+  }, [classSlots])
+
   const openScheduleModal = () => {
     setScheduleSaveError(null)
-    setSlotsByDay(buildSlotsByDay(scheduleSlots))
+    // Hanya muat jadwal personal ke form — jadwal kelas read-only
+    setSlotsByDay(buildSlotsByDay(personalSlots))
     setScheduleModalOpen(true)
   }
+
+  // Track mode & live meeting URL per slot (diisi oleh callback onModeLoaded)
+  const [slotModeInfo, setSlotModeInfo] = useState<Record<string, { mode: 'LANGSUNG' | 'MAYA'; url: string }>>({})
+  const handleModeLoaded = useCallback((slotId: string, info: { mode: 'LANGSUNG' | 'MAYA'; url: string }) => {
+    setSlotModeInfo(prev => ({ ...prev, [slotId]: info }))
+  }, [])
 
   const addSlotRow = (dayIndex: number) => {
     setSlotsByDay((prev) => ({
@@ -354,23 +374,34 @@ export default function CalendarPage() {
       <div className="stats-row">
         <div className="stats-card">
           <div className="stats-label">Tugas Hari Ini</div>
-          <div className="stats-value">{stats.today}</div>
+          <div className="stats-value">{loading ? <span className="agenda-skeleton-line" style={{ height: 24, width: 40, display: 'inline-block' }}></span> : stats.today}</div>
         </div>
         <div className="stats-card">
           <div className="stats-label">7 Hari Ke Depan</div>
-          <div className="stats-value">{stats.week}</div>
+          <div className="stats-value">{loading ? <span className="agenda-skeleton-line" style={{ height: 24, width: 40, display: 'inline-block' }}></span> : stats.week}</div>
         </div>
         <div className="stats-card danger">
           <div className="stats-label">Overdue</div>
-          <div className="stats-value">{stats.overdue}</div>
+          <div className="stats-value">{loading ? <span className="agenda-skeleton-line" style={{ height: 24, width: 40, display: 'inline-block' }}></span> : stats.overdue}</div>
         </div>
       </div>
 
       <section className="schedule-summary-card">
         <div className="schedule-summary-head">
           <h6 className="mb-0">Jadwal mingguan (kuliah / sekolah)</h6>
-          <span className="schedule-summary-meta">{scheduleSlots.length} entri</span>
+          <span className="schedule-summary-meta">{loading ? '…' : `${scheduleSlots.length} entri`}</span>
         </div>
+        {loading ? (
+          <div className="schedule-summary-grid">
+            {WEEKDAY_LABELS.map((label) => (
+              <div key={label} className="schedule-summary-day">
+                <div className="schedule-summary-dow">{label}</div>
+                <div className="agenda-skeleton-line" style={{ height: 10, width: '80%', marginTop: 8 }}></div>
+                <div className="agenda-skeleton-line" style={{ height: 8, width: '60%', marginTop: 6 }}></div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="schedule-summary-grid">
           {WEEKDAY_LABELS.map((label, idx) => {
             const slots = scheduleByDay.get(idx) ?? []
@@ -401,6 +432,7 @@ export default function CalendarPage() {
             )
           })}
         </div>
+        )}
       </section>
 
       <div className="calendar-shell">
@@ -468,12 +500,20 @@ export default function CalendarPage() {
                   <div className="agenda-list">
                     {selectedScheduleSlots.map((s) => {
                       const dur = formatSlotDurationLabel(s.startTime, s.endTime)
+                      const modeInfo = slotModeInfo[s.id]
                       return (
                       <div key={s.id} className="agenda-item agenda-schedule">
                         <div className="agenda-title-row">
                           <div className="agenda-title">{s.title}</div>
                           <div className="d-flex align-items-center gap-2">
-                            <SessionModeToggle slotId={s.id} slotType={s.groupId ? 'class' : 'personal'} dateStr={selectedKey} groupId={s.groupId ?? undefined} isAdmin={s.isAdmin} />
+                            <SessionModeToggle
+                              slotId={s.id}
+                              slotType={s.groupId ? 'class' : 'personal'}
+                              dateStr={selectedKey}
+                              groupId={s.groupId ?? undefined}
+                              isAdmin={s.isAdmin}
+                              onModeLoaded={(info) => handleModeLoaded(s.id, info)}
+                            />
                             <span className="badge schedule-badge">Jadwal</span>
                           </div>
                         </div>
@@ -499,10 +539,10 @@ export default function CalendarPage() {
                             <AttendanceSelect slotId={s.id} slotType={s.groupId ? 'class' : 'personal'} dateStr={selectedKey} />
                           </div>
                         </div>
-                        {/* Live Meeting Link */}
-                        {s.liveMeetingUrl && (
-                          <div className="agenda-live-meeting">
-                            <a href={s.liveMeetingUrl} target="_blank" rel="noopener noreferrer" className="agenda-live-btn">
+                        {/* Buka Live Meeting — di bawah, hanya saat MAYA + ada URL */}
+                        {modeInfo?.mode === 'MAYA' && modeInfo.url && (
+                          <div className="agenda-live-meeting mt-2">
+                            <a href={modeInfo.url} target="_blank" rel="noopener noreferrer" className="agenda-live-btn">
                               <i className="bi bi-camera-video-fill"></i> Buka Live Meeting
                             </a>
                           </div>
@@ -510,6 +550,7 @@ export default function CalendarPage() {
                       </div>
                       )
                     })}
+
                   </div>
                 </div>
               )}
@@ -559,7 +600,7 @@ export default function CalendarPage() {
         >
           <div className="schedule-modal-panel" onClick={(e) => e.stopPropagation()}>
             <div className="schedule-modal-head">
-              <h6 id="schedule-modal-title" className="mb-0">Tambah / edit jadwal mingguan</h6>
+              <h6 id="schedule-modal-title" className="mb-0">Tambah / edit jadwal pribadi</h6>
               <button type="button" className="btn btn-sm btn-light" onClick={() => setScheduleModalOpen(false)} aria-label="Tutup">
                 ×
               </button>
@@ -567,6 +608,37 @@ export default function CalendarPage() {
             <p className="schedule-modal-desc text-muted small">
               Per hari bisa beberapa mapel: pakai tombol &quot;+ Mapel&quot;. Baris tanpa judul diabaikan saat simpan. Jadwal tampil di ringkasan, kalender, dan dashboard (hari ini · WIB).
             </p>
+            {/* ── Jadwal kelas read-only info ── */}
+            {classSlots.length > 0 && (
+              <div className="class-schedule-readonly">
+                <div className="class-schedule-readonly-head">
+                  <i className="bi bi-lock-fill"></i>
+                  <div>
+                    <strong>Jadwal Kelas ({classSlots.length} entri)</strong>
+                    <div className="class-schedule-readonly-note">Jadwal kelas hanya bisa diubah oleh komisaris melalui halaman kelas masing-masing.</div>
+                  </div>
+                </div>
+                <div className="class-schedule-readonly-list">
+                  {WEEKDAY_LABELS.map((label, idx) => {
+                    const dayClassSlots = classSlotsByDay[idx] ?? []
+                    if (dayClassSlots.length === 0) return null
+                    return (
+                      <div key={label} className="class-schedule-readonly-day">
+                        <span className="class-schedule-readonly-dow">{label}</span>
+                        {dayClassSlots.map((s) => (
+                          <div key={s.id} className="class-schedule-readonly-slot">
+                            <span className="class-schedule-readonly-title">{s.title}</span>
+                            {(s.startTime || s.endTime) && (
+                              <span className="class-schedule-readonly-time">{s.startTime ?? '—'} – {s.endTime ?? '—'}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             {scheduleSaveError && (
               <div className="alert alert-danger py-2 px-3 small mb-3" role="alert">
                 {scheduleSaveError}
@@ -1011,6 +1083,72 @@ export default function CalendarPage() {
           justify-content: flex-end;
           gap: 8px;
           padding-top: 4px;
+        }
+        /* ── Class schedule read-only styles ── */
+        .class-schedule-readonly {
+          background: color-mix(in srgb, var(--sh-card-bg) 88%, #0d9488 12%);
+          border: 1.5px solid #99f6e4;
+          border-radius: 12px;
+          padding: 12px;
+          margin-bottom: 14px;
+        }
+        .class-schedule-readonly-head {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+        .class-schedule-readonly-head i {
+          color: #0d9488;
+          font-size: 16px;
+          margin-top: 2px;
+        }
+        .class-schedule-readonly-head strong {
+          font-size: 13px;
+          color: #0f766e;
+          display: block;
+        }
+        .class-schedule-readonly-note {
+          font-size: 11px;
+          color: #115e59;
+          margin-top: 2px;
+          line-height: 1.4;
+        }
+        .class-schedule-readonly-list {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .class-schedule-readonly-day {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .class-schedule-readonly-dow {
+          font-size: 10px;
+          font-weight: 800;
+          color: #0f766e;
+          text-transform: uppercase;
+          min-width: 48px;
+        }
+        .class-schedule-readonly-slot {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: color-mix(in srgb, var(--sh-card-bg) 80%, #0d9488 20%);
+          border: 1px solid #5eead4;
+          border-radius: 8px;
+          padding: 3px 8px;
+        }
+        .class-schedule-readonly-title {
+          font-size: 11px;
+          font-weight: 700;
+          color: #134e4a;
+        }
+        .class-schedule-readonly-time {
+          font-size: 10px;
+          color: #0f766e;
         }
         @media (max-width: 992px) {
           .stats-row { grid-template-columns: 1fr; }

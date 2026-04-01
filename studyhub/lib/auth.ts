@@ -4,6 +4,7 @@ import GoogleProvider from 'next-auth/providers/google'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
 import { db } from './db'
+import { isDevPremium } from './dev-premium'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(db),
@@ -29,9 +30,10 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null
+        const email = credentials.email.trim().toLowerCase()
 
         const user = await db.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
         })
 
         if (!user || !user.password) return null
@@ -56,13 +58,36 @@ export const authOptions: NextAuthOptions = {
       }
       return true
     },
-    async jwt({ token, user }) {
-      if (user) token.id = user.id
+    async jwt({ token, user, trigger }) {
+      if (user) {
+        token.id = user.id
+        token.email = user.email
+      }
+      // Dev override: always checked on every token refresh
+      const emailForCheck = (token.email as string | null)
+      const isDevUser = isDevPremium(emailForCheck)
+      if (isDevUser) {
+        token.isPremium = true
+        token.isDeveloper = true
+      } else if (user || trigger === 'update') {
+        token.isDeveloper = false
+        try {
+          const dbUser = await db.user.findUnique({
+            where: { id: (token.id as string) },
+            select: { isPremium: true },
+          })
+          token.isPremium = dbUser?.isPremium ?? false
+        } catch {
+          token.isPremium = false
+        }
+      }
       return token
     },
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string
+        ;(session.user as any).isPremium = token.isPremium ?? false
+        ;(session.user as any).isDeveloper = token.isDeveloper ?? false
       }
       return session
     },

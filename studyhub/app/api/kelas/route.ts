@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { createNotificationWithPush } from '@/lib/notification-push'
 
 // GET: list semua kelas user (sebagai admin atau member)
 export async function GET() {
@@ -62,14 +63,11 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  await db.notification.create({
-    data: {
-      userId: session.user.id,
-      type: 'CLASS_CREATED',
-      title: 'Kelas berhasil dibuat',
-      message: `Kelas "${group.name}" telah dibuat. Bagikan kode undangan ke anggota.`,
-      link: `/kelas/${group.id}`,
-    },
+  await createNotificationWithPush(session.user.id, {
+    type: 'CLASS_CREATED',
+    title: 'Kelas berhasil dibuat',
+    message: `Kelas "${group.name}" telah dibuat. Bagikan kode undangan ke anggota.`,
+    link: `/kelas/${group.id}`,
   })
 
   return NextResponse.json({

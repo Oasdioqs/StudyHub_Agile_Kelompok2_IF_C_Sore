@@ -26,12 +26,18 @@ model User {
   updatedAt        DateTime       @updatedAt
   resetToken       String?
   resetTokenExpiry DateTime?
+  isPremium        Boolean        @default(false)
+  // Lifetime upload counters — never decremented, prevents abuse
+  pdfUploadCount   Int            @default(0)
+  videoUploadCount Int            @default(0)
   accounts              Account[]
   aiSessions            AISession[]
   flashcardSets         FlashcardSet[]
   groupMembers          GroupMember[]
   notes                 Note[]
   notifications         Notification[]
+  pdfDocuments          PdfDocument[]
+  videoSummaries        VideoSummary[]
   replies               Reply[]
   sessions              Session[]
   tasks                 Task[]
@@ -418,6 +424,70 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model PdfDocument {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  fileName      String
+  pageCount     Int            @default(0)
+  charCount     Int            @default(0)
+  extractedText String         @db.Text
+  summary       String?        @db.Text
+  status        PdfStatus      @default(PROCESSING)
+  deletedAt     DateTime?      // soft-delete: isi = deleted, null = active
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  challenges    PdfChallenge[]
+
+  @@index([userId])
+  @@map("pdf_documents")
+}
+
+model VideoSummary {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  sourceUrl   String        // YouTube URL atau nama file
+  sourceType  String        @default("youtube") // "youtube" | "upload"
+  transcript  String?       @db.Text
+  summary     String?       @db.Text
+  duration    Int?          // durasi video dalam detik
+  status      VideoStatus   @default(PROCESSING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([userId])
+  @@map("video_summaries")
+}
+
+enum VideoStatus {
+  PROCESSING
+  READY
+  ERROR
+}
+
+model PdfChallenge {
+  id         String      @id @default(cuid())
+  documentId String
+  document   PdfDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  question   String
+  answer     String
+  difficulty String      @default("medium")
+  sortOrder  Int         @default(0)
+  createdAt  DateTime    @default(now())
+
+  @@index([documentId])
+  @@map("pdf_challenges")
+}
+
+enum PdfStatus {
+  PROCESSING
+  READY
+  ERROR
 }
 
 enum Priority {

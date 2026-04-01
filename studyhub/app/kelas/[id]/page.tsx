@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 type SyncMode = 'MAYA' | 'LANGSUNG'
@@ -99,6 +99,16 @@ export default function ClassDetailPage() {
     fetchClassData()
   }, [id])
 
+  // Read ?tab= query param for deep-linking (FCM / bell notification click)
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam && ['tasks', 'announcements', 'schedule', 'members'].includes(tabParam)) {
+      setActiveTab(tabParam as typeof activeTab)
+      if (tabParam === 'announcements') fetchAnnouncements()
+    }
+  }, [searchParams])
+
   const fetchClassData = async () => {
     setLoading(true)
     try {
@@ -144,9 +154,11 @@ export default function ClassDetailPage() {
     }
   }
 
+  const [annFcmInfo, setAnnFcmInfo] = useState('')
   const handleSendAnnounce = async (e: React.FormEvent) => {
     e.preventDefault()
     setSendingAnn(true)
+    setAnnFcmInfo('')
     try {
       const res = await fetch(`/api/kelas/${id}/announce`, {
         method: 'POST',
@@ -154,14 +166,18 @@ export default function ClassDetailPage() {
         body: JSON.stringify({ title: annTitle, message: annMsg }),
       })
       if (res.ok) {
+        const d = await res.json()
         setAnnSuccess(true)
+        // Tampilkan info FCM untuk debugging
+        setAnnFcmInfo(`Notif dikirim ke ${d.sent} anggota. FCM: ${d.fcmTokenCount} device(s) — ${d.fcmResult}`)
         setTimeout(() => {
           setShowAnnounce(false)
           setAnnTitle('')
           setAnnMsg('')
           setAnnSuccess(false)
+          setAnnFcmInfo('')
           fetchAnnouncements() // refresh tab pengumuman
-        }, 1800)
+        }, 4000) // Diperpanjang supaya sempat baca info FCM
       } else {
         const d = await res.json().catch(() => null)
         alert(d?.error || 'Gagal mengirim broadcast.')
@@ -249,7 +265,7 @@ export default function ClassDetailPage() {
     await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: taskTitle, description: taskDesc, deadline: taskDeadline || null, priority: taskPriority }),
+      body: JSON.stringify({ title: taskTitle, description: taskDesc, deadline: taskDeadline ? taskDeadline + ':00+07:00' : null, priority: taskPriority }),
     })
     setSavingTask(false)
     setShowTaskModal(false)
@@ -843,6 +859,11 @@ export default function ClassDetailPage() {
                 {annSuccess && (
                   <div className="cd-success-banner">
                     <i className="bi bi-check-circle-fill me-2" /> Pengumuman berhasil dikirim!
+                    {annFcmInfo && (
+                      <div style={{ fontSize: '0.78rem', marginTop: 6, opacity: 0.85, fontWeight: 400 }}>
+                        <i className="bi bi-phone-vibrate me-1" />{annFcmInfo}
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="cd-form-group">
