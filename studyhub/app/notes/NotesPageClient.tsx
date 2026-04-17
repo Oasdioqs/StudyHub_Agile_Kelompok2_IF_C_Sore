@@ -2,8 +2,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { useRouter } from 'next/navigation'
-import Sidebar from '@/components/layout/Sidebar'
-import TopbarShell from '@/components/layout/TopbarShell'
 
 type Note = {
   id: string
@@ -100,12 +98,6 @@ export default function NotesPageClient() {
     searchQueryRef.current = searchQuery
   }, [searchQuery])
 
-  // Prevent double sidebar flash on mount
-  useEffect(() => {
-    const wrapper = document.querySelector<HTMLElement>('.notes-page-wrapper')
-    if (wrapper) wrapper.style.visibility = 'visible'
-    return () => { if (wrapper) wrapper.style.visibility = '' }
-  }, [])
 
   // Fetch notes
   const fetchNotes = useCallback(async () => {
@@ -341,10 +333,7 @@ export default function NotesPageClient() {
   const uniqueTags = Array.from(new Set(notes.flatMap((n) => n.tags || []))).sort()
 
   return (
-    <div className="notes-page-wrapper" style={{ visibility: 'hidden' }}>
-      <Sidebar />
-      <div className="app-main">
-        <main className="p-4 page-transition" style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div className="animate-fade-up" style={{ maxWidth: 1100, margin: '0 auto' }}>
 
           {viewMode === 'list' ? (
             <>
@@ -742,8 +731,6 @@ export default function NotesPageClient() {
               </div>
             </div>
           )}
-        </main>
-      </div>
     </div>
   )
 }

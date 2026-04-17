@@ -1,9 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { db } from '@/lib/db'
 import { sendEmail } from '@/lib/mail'
+import { checkRateLimit, getIP, RATE_LIMITS, rateLimitResponse } from '@/lib/rate-limit'
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const ip = getIP(req)
+  const rl = checkRateLimit(ip, RATE_LIMITS.forgotPassword)
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt)
+
   const { email } = await req.json()
 
   const user = await db.user.findUnique({ where: { email } })

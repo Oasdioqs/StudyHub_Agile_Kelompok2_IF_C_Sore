@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { isDevPremium } from '@/lib/dev-premium'
+import { checkRateLimit, RATE_LIMITS, rateLimitResponse } from '@/lib/rate-limit'
 
 const FREE_DAILY_LIMIT = 10
 
@@ -33,6 +34,10 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const userId = session.user.id
+
+  // Burst protection: max 30 AI requests per hour per user
+  const rl = checkRateLimit(userId, RATE_LIMITS.ai)
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt)
 
   try {
     // ── Cek daily limit untuk free user ──────────────────────────────────────

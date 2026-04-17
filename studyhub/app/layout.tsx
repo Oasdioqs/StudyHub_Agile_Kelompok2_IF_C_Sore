@@ -4,6 +4,7 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 import '@/styles/globals.css'
 import { Providers } from './providers'
+import { CookieConsent } from '@/components/CookieConsent'
 
 const inter = Inter({
   subsets: ['latin', 'latin-ext'],
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="id" suppressHydrationWarning>
       <body className={`${inter.variable} ${inter.className}`}>
         <Providers>{children}</Providers>
+        <CookieConsent />
       </body>
     </html>
   )

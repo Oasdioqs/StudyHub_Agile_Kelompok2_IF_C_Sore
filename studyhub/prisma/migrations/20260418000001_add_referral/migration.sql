@@ -1,0 +1,5 @@
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "referralCode" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "referredBy" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "referralCount" INTEGER NOT NULL DEFAULT 0;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "users_referralCode_key" ON "users"("referralCode");

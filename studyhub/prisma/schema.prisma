@@ -27,6 +27,10 @@ model User {
   resetToken       String?
   resetTokenExpiry DateTime?
   isPremium        Boolean        @default(false)
+  onboardingDone   Boolean        @default(false)
+  referralCode     String?        @unique
+  referredBy       String?        // userId who referred this user
+  referralCount    Int            @default(0) // how many users this user referred
   // Lifetime upload counters — never decremented, prevents abuse
   pdfUploadCount   Int            @default(0)
   videoUploadCount Int            @default(0)

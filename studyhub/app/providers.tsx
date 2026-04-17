@@ -2,6 +2,7 @@
 
 import { SessionProvider } from 'next-auth/react'
 import { useFCM } from '@/hooks/useFCM'
+import { PostHogProvider } from '@/components/PostHogProvider'
 
 function FCMProvider({ children }: { children: React.ReactNode }) {
   useFCM()
@@ -11,7 +12,9 @@ function FCMProvider({ children }: { children: React.ReactNode }) {
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <FCMProvider>{children}</FCMProvider>
+      <PostHogProvider>
+        <FCMProvider>{children}</FCMProvider>
+      </PostHogProvider>
     </SessionProvider>
   )
 }
