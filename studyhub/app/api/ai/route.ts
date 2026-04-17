@@ -575,15 +575,22 @@ ${contextStr}`
       })
 
       if (res.ok) {
-        aiData = await res.json()
+        const parsed = await res.json()
+        // OpenRouter kadang return 200 tapi isinya error (rate limit dll)
+        if (parsed?.error) {
+          const code = parsed.error?.code
+          if (code === 429 || code === 503 || code === 404) continue
+          return NextResponse.json({ error: parsed.error?.message || 'AI Error' }, { status: 500 })
+        }
+        aiData = parsed
         break
       }
 
       const errText = await res.text()
       lastErr = errText
-      // Jika 404 (model not found) → coba model berikutnya
-      if (res.status === 404 || res.status === 503) continue
-      // Error lain (auth, dll) → langsung berhenti
+      // 404 = model not found, 429 = rate limited, 503 = unavailable → coba model berikutnya
+      if (res.status === 404 || res.status === 429 || res.status === 503) continue
+      // Error lain (401 auth, dll) → langsung berhenti
       return NextResponse.json({ error: `AI Error: ${errText}` }, { status: 500 })
     }
 
