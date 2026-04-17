@@ -130,8 +130,8 @@ export default function KelasIndex() {
           {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
         </div>
       ) : kelasList.length === 0 ? (
-        <div className="kelas-empty">
-          <div className="kelas-empty-icon">
+        <div className="kelas-empty animate-fade-up">
+          <div className="kelas-empty-icon empty-state-icon">
             <i className="bi bi-people-fill" />
           </div>
           <h5 className="kelas-empty-title">Kamu belum bergabung di kelas apapun.</h5>
@@ -146,8 +146,7 @@ export default function KelasIndex() {
           {kelasList.map((k, idx) => (
             <div
               key={k.id}
-              className="col-12 col-md-6 col-lg-4"
-              style={{ animationDelay: `${idx * 60}ms` }}
+              className={`col-12 col-md-6 col-lg-4 animate-fade-up stagger-${Math.min(idx + 1, 6)}`}
             >
               <Link href={`/kelas/${k.id}`} className="text-decoration-none">
                 <div className={`kelas-card ${k.role === 'ADMIN' ? 'kelas-card-admin' : ''}`}>
