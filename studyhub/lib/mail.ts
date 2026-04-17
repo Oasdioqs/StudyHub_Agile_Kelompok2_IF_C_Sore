@@ -1,15 +1,9 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import crypto from 'crypto'
 import { db } from '@/lib/db'
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '465'),
-  secure: true, // Use SSL/TLS
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-})
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+const FROM = process.env.EMAIL_FROM || 'StudyHub <noreply@studyhub.app>'
 
 export async function sendEmail({
   to,
@@ -20,19 +14,13 @@ export async function sendEmail({
   subject: string
   html: string
 }) {
-  const from = process.env.EMAIL_FROM || 'StudyHub <noreply@studyhub.com>'
-
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.error('SMTP configuration is missing (SMTP_USER or SMTP_PASS).')
-    throw new Error('Konfigurasi SMTP email belum diset.')
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY belum dikonfigurasi.')
   }
 
-  return transporter.sendMail({
-    from,
-    to,
-    subject,
-    html,
-  })
+  const { data, error } = await resend.emails.send({ from: FROM, to, subject, html })
+  if (error) throw new Error(error.message)
+  return { messageId: data?.id }
 }
 
 // ─── Email helper: base template wrapper ─────────────────────────────────────
@@ -123,7 +111,7 @@ export async function sendTipsEmail(to: string, name: string): Promise<void> {
   await sendEmail({ to, subject: `Tips belajar untuk ${firstName} 📚`, html: emailBase(content) }).catch(() => null)
 }
 
-// ─── Re-engagement Email (Day 7+) ────────────────────────────────────────────
+// ─── Re-engagement Email ──────────────────────────────────────────────────────
 export async function sendReengagementEmail(to: string, name: string): Promise<void> {
   const baseUrl = process.env.NEXTAUTH_URL || 'https://studyhub-olive.vercel.app'
   const firstName = name.split(' ')[0]
@@ -145,67 +133,48 @@ export async function sendReengagementEmail(to: string, name: string): Promise<v
   await sendEmail({ to, subject: `${firstName}, ada yang menunggu di StudyHub 📬`, html: emailBase(content) }).catch(() => null)
 }
 
+// ─── Verification Email ───────────────────────────────────────────────────────
 export async function resendVerificationEmail(email: string) {
   const token = crypto.randomBytes(32).toString('hex')
   const expires = new Date(Date.now() + 1000 * 60 * 60 * 24)
 
-  await db.verificationToken.create({
-    data: {
-      identifier: email,
-      token,
-      expires,
-    },
-  })
+  await db.verificationToken.create({ data: { identifier: email, token, expires } })
 
   const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
   const verifyUrl = `${baseUrl}/auth/verify-email?token=${token}`
 
+  const content = `
+    <h1 style="margin:0 0 8px;font-size:24px;font-weight:800;color:#111827;">Konfirmasi Email</h1>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#4b5563;">
+      Terima kasih telah bergabung di StudyHub. Klik tombol di bawah untuk memverifikasi akunmu.
+    </p>
+    ${emailButton(verifyUrl, 'Verifikasi Email')}
+    <p style="margin:16px 0 0;font-size:13px;color:#9ca3af;">Link berlaku selama 24 jam.</p>
+    <p style="margin:8px 0 0;font-size:13px;color:#9ca3af;">
+      Atau copy link ini: <a href="${verifyUrl}" style="color:#4f46e5;word-break:break-all;">${verifyUrl}</a>
+    </p>
+  `
+
   try {
-    const result = await sendEmail({
-      to: email,
-      subject: 'Konfirmasi Email - StudyHub',
-      html: `
-      <!doctype html>
-      <html>
-        <body style="margin:0; padding:0; background:#f6f7fb;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;">
-            <tr>
-              <td align="center" style="padding:32px 16px;">
-                <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%; max-width:600px; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(17,24,39,0.08);">
-                  <tr>
-                    <td style="padding:26px 24px 6px;">
-                      <div style="font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#6b7280; font-size:13px; font-weight:700;">
-                        STUDYHUB
-                      </div>
-                      <h1 style="margin:12px 0 0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:24px; color:#111827;">
-                        Konfirmasi Email
-                      </h1>
-                      <p style="margin:12px 0 0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:15px; line-height:1.6; color:#4b5563;">
-                        Terima kasih telah bergabung di StudyHub. Silahkan klik tombol ini untuk memverifikasi akun kamu.
-                      </p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding:20px 24px 26px;">
-                      <a href="${verifyUrl}" style="display:inline-block; padding:13px 20px; background:#4f46e5; color:#fff; border-radius:12px; text-decoration:none; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:14px; font-weight:800;">
-                        Verifikasi Email
-                      </a>
-                      <p style="margin:12px 0 0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:13px; color:#6b7280;">
-                        Link berlaku selama 24 jam.
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `
-    })
+    const result = await sendEmail({ to: email, subject: 'Konfirmasi Email - StudyHub', html: emailBase(content) })
     return { success: true, messageId: result.messageId }
   } catch (error: any) {
-    console.error('VERIFICATION EMAIL ERROR:', error)
     return { error: { message: error.message || 'Gagal mengirim email verifikasi.' } }
   }
+}
+
+// ─── Reset Password Email ─────────────────────────────────────────────────────
+export async function sendResetPasswordEmail(to: string, link: string) {
+  const content = `
+    <h1 style="margin:0 0 8px;font-size:24px;font-weight:800;color:#111827;">Reset Password</h1>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#4b5563;">
+      Kami menerima permintaan untuk mereset password akun kamu. Gunakan tombol di bawah untuk mengatur password baru.
+    </p>
+    ${emailButton(link, 'Reset Password')}
+    <p style="margin:16px 0 0;font-size:13px;color:#9ca3af;">Link ini berlaku selama <b>15 menit</b>.</p>
+    <p style="margin:8px 0 0;font-size:13px;color:#9ca3af;">
+      Jika kamu tidak meminta reset password, abaikan email ini.
+    </p>
+  `
+  return sendEmail({ to, subject: 'Reset Password StudyHub 🔐', html: emailBase(content) })
 }
