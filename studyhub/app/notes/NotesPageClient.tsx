@@ -93,13 +93,26 @@ export default function NotesPageClient() {
   const [allTags, setAllTags] = useState<string[]>([])
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentRef = useRef(activeNote)
+  const searchQueryRef = useRef(searchQuery)
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    searchQueryRef.current = searchQuery
+  }, [searchQuery])
+
+  // Prevent double sidebar flash on mount
+  useEffect(() => {
+    const wrapper = document.querySelector<HTMLElement>('.notes-page-wrapper')
+    if (wrapper) wrapper.style.visibility = 'visible'
+    return () => { if (wrapper) wrapper.style.visibility = '' }
+  }, [])
 
   // Fetch notes
   const fetchNotes = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (searchQuery) params.append('search', searchQuery)
+      if (searchQueryRef.current) params.append('search', searchQueryRef.current)
       const { data } = await axios.get(`/api/notes?${params.toString()}`)
       setNotes(data)
       // Extract all tags
@@ -111,7 +124,7 @@ export default function NotesPageClient() {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery])
+  }, [])
 
   // Fetch groups for sharing
   const fetchGroups = useCallback(async () => {
@@ -311,6 +324,14 @@ export default function NotesPageClient() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Search on query change (debounced)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchNotes()
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchQuery, fetchNotes])
+
   // Filter notes by tag
   const filteredNotes = selectedTag
     ? notes.filter((n) => n.tags?.includes(selectedTag))
@@ -320,24 +341,18 @@ export default function NotesPageClient() {
   const uniqueTags = Array.from(new Set(notes.flatMap((n) => n.tags || []))).sort()
 
   return (
-    <div>
+    <div className="notes-page-wrapper" style={{ visibility: 'hidden' }}>
       <Sidebar />
       <div className="app-main">
-        <TopbarShell />
         <main className="p-4 page-transition" style={{ maxWidth: 1100, margin: '0 auto' }}>
 
           {viewMode === 'list' ? (
             <>
-              {/* Header */}
+              {/* Header with title + action button */}
               <div className="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-3">
                 <div>
-                  <h5 className="fw-bold mb-1 d-flex align-items-center gap-2">
-                    <span style={{ fontSize: 22 }}>📝</span>
-                    Catatan Digital
-                  </h5>
-                  <p className="text-muted small mb-0">
-                    Tulis catatan dengan Markdown, auto-save, dan partage ke kelas
-                  </p>
+                  <h5 className="fw-bold mb-1">📝 Catatan Digital</h5>
+                  <p className="text-muted small mb-0">Tulis catatan dengan Markdown, auto-save, dan bagikan ke kelas</p>
                 </div>
                 <button
                   className="btn d-flex align-items-center gap-2"
@@ -515,7 +530,7 @@ export default function NotesPageClient() {
                   placeholder="Judul catatan..."
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  style={{ fontSize: 18, borderRadius: 12, border: 'none', borderBottom: '2px solid var(--sh-border)', borderRadius: 0, background: 'transparent', padding: '8px 0' }}
+                  style={{ fontSize: 18, border: 'none', borderBottom: '2px solid var(--sh-border)', borderRadius: 0, background: 'transparent', padding: '8px 0' }}
                 />
                 <div className="d-flex gap-2 ms-auto">
                   <button className="btn btn-outline-danger d-flex align-items-center gap-2" style={{ borderRadius: 12 }} onClick={() => deleteNote(activeNote?.id!)} disabled={!activeNote}>

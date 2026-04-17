@@ -5,12 +5,17 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+  // HSTS: force HTTPS for 1 year, including subdomains
+  { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
 ]
 
 const nextConfig = {
   reactStrictMode: true,
   compress: true,
   poweredByHeader: false,
+  experimental: {
+    serverComponentsExternalPackages: ['mammoth', 'unzipper'],
+  },
   // Exclude native binaries from webpack bundling — loaded at runtime by Node.js
   webpack(config, { isServer }) {
     if (isServer) {
@@ -21,12 +26,18 @@ const nextConfig = {
         '@napi-rs/canvas-linux-arm64-gnu',
         '@napi-rs/canvas-darwin-x64',
         '@napi-rs/canvas-darwin-arm64',
+        'mammoth',
+        'unzipper',
       ]
     }
     return config
   },
   images: {
-    domains: ['lh3.googleusercontent.com', 'avatars.githubusercontent.com'],
+    // remotePatterns replaces deprecated `domains`
+    remotePatterns: [
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
+    ],
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },

@@ -15,7 +15,7 @@ const navItems = [
   { href: '/forum',          icon: 'bi-chat-dots',             label: 'Forum Diskusi' },
   { href: '/flashcards',     icon: 'bi-card-list',             label: 'Flashcard' },
   { href: '/ai-tutor',       icon: 'bi-robot',                 label: 'StudyHub AI' },
-  { href: '/pdf-library',    icon: 'bi-file-earmark-richtext', label: 'PDF AI',           badge: 'Premium' },
+  { href: '/pdf-library',    icon: 'bi-file-earmark-richtext', label: 'Dokumen AI',       badge: 'Premium' },
   { href: '/video-summary',  icon: 'bi-play-circle',           label: 'Video AI',         badge: 'Beta' },
   { href: '/timer',          icon: 'bi-alarm',                 label: 'Pomodoro Timer' },
   { href: '/leaderboard',    icon: 'bi-trophy',                label: 'Leaderboard' },
@@ -192,7 +192,7 @@ export default function Sidebar() {
               navItems[10], // Timer
               navItems[11], // Leaderboard
               navItems[12], // Analitik
-              navItems[8],  // PDF AI
+              navItems[8],  // Dokumen AI
               navItems[9],  // Video AI
               navItems[7],  // AI Tutor
               navItems[13], // Upgrade Premium
@@ -202,6 +202,7 @@ export default function Sidebar() {
               if (shortLabel === 'Leaderboard') shortLabel = 'Peringkat'
               if (shortLabel === 'Pomodoro Timer') shortLabel = 'Timer'
               if (shortLabel === 'Forum Diskusi') shortLabel = 'Forum'
+              if (shortLabel === 'Dokumen AI') shortLabel = 'Dokumen'
               const isActive = pathname === item.href
               return (
                 <Link

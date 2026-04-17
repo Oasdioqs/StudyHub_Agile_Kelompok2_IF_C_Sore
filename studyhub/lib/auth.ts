@@ -86,8 +86,8 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string
-        ;(session.user as any).isPremium = token.isPremium ?? false
-        ;(session.user as any).isDeveloper = token.isDeveloper ?? false
+        session.user.isPremium = token.isPremium ?? false
+        session.user.isDeveloper = token.isDeveloper ?? false
       }
       return session
     },

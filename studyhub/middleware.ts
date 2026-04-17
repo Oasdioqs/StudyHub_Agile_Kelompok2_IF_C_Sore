@@ -2,7 +2,6 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
-const EMAIL_VERIFIED_COOKIE = 'email_verified_for'
 const OTP_COOKIE = 'otp_verified_for'
 
 export async function middleware(req: NextRequest) {

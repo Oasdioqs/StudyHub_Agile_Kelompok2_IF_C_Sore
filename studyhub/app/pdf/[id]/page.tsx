@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '@/components/layout/Sidebar'
 import TopbarShell from '@/components/layout/TopbarShell'
+import { isTrustedSummaryImageUrl } from '@/lib/summary-figure-url'
 
 type Challenge = {
   id: string
@@ -18,12 +19,64 @@ type PdfDetail = {
   id: string
   title: string
   fileName: string
+  fileKind?: string
   pageCount: number
   charCount: number
   summary: string | null
+  summaryFull?: string | null
+  summaryFigures?: unknown
   status: string
   createdAt: string
   challenges: Challenge[]
+}
+
+type SummaryFigure = { url: string; caption: string }
+
+function parseSummaryFigures(raw: unknown): SummaryFigure[] {
+  if (!Array.isArray(raw)) return []
+  const out: SummaryFigure[] = []
+  for (const x of raw) {
+    if (!x || typeof x !== 'object') continue
+    const o = x as Record<string, unknown>
+    const url = o.url
+    const caption = o.caption
+    if (typeof url !== 'string' || typeof caption !== 'string') continue
+    if (!isTrustedSummaryImageUrl(url)) continue
+    out.push({ url, caption })
+  }
+  return out
+}
+
+function escHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/** Ringkasan markdown → HTML aman; gambar ![alt](url) hanya jika host Blob tepercaya. */
+function summaryMarkdownToSafeHtml(md: string): string {
+  let s = md
+  s = s.replace(/!\[([^\]]*)\]\((https:[^)\s]+)\)/g, (_, alt: string, url: string) => {
+    if (!isTrustedSummaryImageUrl(url)) {
+      return escHtml(`![${alt}](tautan gambar tidak diizinkan)`)
+    }
+    const a = escHtml(alt || 'Gambar')
+    return `<figure style="margin:16px 0;text-align:center;"><img src="${url}" alt="${a}" loading="lazy" decoding="async" referrerpolicy="no-referrer" style="max-width:100%;height:auto;border-radius:12px;border:1px solid var(--sh-border);box-shadow:0 4px 14px rgba(0,0,0,0.08);" /><figcaption style="font-size:12px;color:var(--sh-muted);margin-top:8px;text-align:center;">${a}</figcaption></figure>`
+  })
+  s = s
+    .replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) =>
+      `<pre style="background:var(--sh-hover);border:1px solid var(--sh-border);border-radius:10px;padding:12px 14px;overflow-x:auto;font-size:12.5px;margin:10px 0;"><div style="font-size:10px;color:var(--sh-muted);margin-bottom:6px;font-weight:700;">${String(lang || 'CODE').toUpperCase()}</div><code style="font-family:monospace;color:var(--sh-text);white-space:pre;">${String(code).replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()}</code></pre>`)
+    .replace(/`([^`]+)`/g, '<code style="background:var(--sh-hover);border-radius:4px;padding:1px 5px;font-size:12px;font-family:monospace;">$1</code>')
+    .replace(/^### (.+)$/gm, '<h6 style="font-weight:600;margin:14px 0 6px;font-size:13px;color:var(--sh-text);">$1</h6>')
+    .replace(/^## (.+)$/gm, '<h6 style="font-weight:700;margin:18px 0 8px;font-size:14px;color:var(--sh-text);display:flex;align-items:center;gap:6px;">$1</h6>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^[-•]\s(.+)$/gm, '<div style="display:flex;gap:8px;margin:4px 0;"><span style="color:#6366f1;flex-shrink:0;">▸</span><span>$1</span></div>')
+    .replace(/^(\d+)\.\s(.+)$/gm, '<div style="display:flex;gap:8px;margin:4px 0;"><span style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">$1</span><span>$2</span></div>')
+    .replace(/\n\n/g, '<br/>')
+    .replace(/\n/g, '<br/>')
+  return s
 }
 
 const diffConfig = {
@@ -87,6 +140,9 @@ export default function PdfDetailPage() {
   const [genError, setGenError] = useState('')
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryError, setSummaryError] = useState('')
+  const [summaryView, setSummaryView] = useState<'short' | 'full'>('short')
+  const [fullLoading, setFullLoading] = useState(false)
+  const [fullError, setFullError] = useState('')
 
   const [question, setQuestion] = useState('')
   const [asking, setAsking] = useState(false)
@@ -115,6 +171,19 @@ export default function PdfDetailPage() {
       setSummaryError(err?.response?.data?.error ?? 'Gagal membuat ringkasan.')
     } finally {
       setSummaryLoading(false)
+    }
+  }
+
+  const generateFullVersion = async () => {
+    setFullLoading(true)
+    setFullError('')
+    try {
+      const { data } = await axios.post(`/api/pdf/${id}/full-version`)
+      setDoc((prev) => (prev ? { ...prev, summaryFull: data.summaryFull } : prev))
+    } catch (err: any) {
+      setFullError(err?.response?.data?.error ?? 'Gagal membuat versi lengkap.')
+    } finally {
+      setFullLoading(false)
     }
   }
 
@@ -179,6 +248,11 @@ export default function PdfDetailPage() {
 
   if (!doc) return null
 
+  const summaryFiguresList = parseSummaryFigures(doc.summaryFigures)
+
+  const fk = doc.fileKind ?? 'pdf'
+  const kindLabel = fk === 'docx' ? 'Word' : fk === 'pptx' ? 'PowerPoint' : 'PDF'
+
   return (
     <div>
       <Sidebar />
@@ -192,9 +266,19 @@ export default function PdfDetailPage() {
               <i className="bi bi-arrow-left" />
             </Link>
             <div className="flex-grow-1 overflow-hidden">
-              <h5 className="fw-bold mb-1 text-truncate" title={doc.title}>{doc.title}</h5>
+              <div className="d-flex align-items-center gap-2 flex-wrap mb-1">
+                <h5 className="fw-bold mb-0 text-truncate" title={doc.title}>{doc.title}</h5>
+                <span className="badge rounded-pill px-2 py-0" style={{ fontSize: 10, background: 'rgba(99,102,241,0.12)', color: '#6366f1', fontWeight: 700 }}>
+                  {kindLabel}
+                </span>
+              </div>
               <p className="text-muted small mb-0">
-                {doc.pageCount > 0 && <><i className="bi bi-file-earmark-text me-1" />{doc.pageCount} halaman · </>}
+                {doc.pageCount > 0 && (
+                  <>
+                    <i className="bi bi-file-earmark-text me-1" />
+                    {doc.pageCount} {fk === 'pptx' ? 'slide' : 'halaman'} ·{' '}
+                  </>
+                )}
                 {doc.fileName}
               </p>
             </div>
@@ -221,7 +305,85 @@ export default function PdfDetailPage() {
           {/* ── TAB: Ringkasan ── */}
           {tab === 'summary' && (
             <div>
-              {doc.summary ? (
+              {doc.status === 'READY' && (
+                <div className="d-flex gap-1 mb-3 p-1 rounded-3" style={{ background: 'var(--sh-hover)', border: '1px solid var(--sh-border)', width: 'fit-content' }}>
+                  <button
+                    type="button"
+                    onClick={() => setSummaryView('short')}
+                    className={`btn btn-sm ${summaryView === 'short' ? 'btn-primary' : 'btn-light'}`}
+                    style={{ borderRadius: 8, fontSize: 13, fontWeight: summaryView === 'short' ? 700 : 500 }}
+                  >
+                    <i className="bi bi-file-text me-1" />Ringkasan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSummaryView('full')}
+                    className={`btn btn-sm ${summaryView === 'full' ? 'btn-primary' : 'btn-light'}`}
+                    style={{ borderRadius: 8, fontSize: 13, fontWeight: summaryView === 'full' ? 700 : 500 }}
+                  >
+                    <i className="bi bi-journal-text me-1" />Full Version
+                  </button>
+                </div>
+              )}
+
+              {summaryView === 'full' && doc.status === 'READY' ? (
+                <div>
+                  {doc.summaryFull ? (
+                    <div className="card" style={{ borderRadius: 14 }}>
+                      <div className="card-body" style={{ padding: '20px 24px' }}>
+                        <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                          <span style={{ fontSize: 20 }}>📖</span>
+                          <span className="fw-bold" style={{ fontSize: 14 }}>Full Version</span>
+                          <span className="text-muted small">
+                            Penjelasan per {fk === 'pptx' ? 'slide' : fk === 'docx' ? 'bagian' : 'halaman'} dari isi dokumen
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-outline-secondary btn-sm ms-auto"
+                            onClick={generateFullVersion}
+                            disabled={fullLoading}
+                          >
+                            {fullLoading ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-arrow-clockwise me-1" />Buat ulang</>}
+                          </button>
+                        </div>
+                        {fullError && (
+                          <div className="alert alert-danger py-2 mb-3" style={{ fontSize: 13, borderRadius: 10 }}>{fullError}</div>
+                        )}
+                        <div
+                          className="pdf-summary-content"
+                          style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--sh-text)' }}
+                          dangerouslySetInnerHTML={{ __html: summaryMarkdownToSafeHtml(doc.summaryFull) }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="card" style={{ borderRadius: 14 }}>
+                      <div className="card-body text-center py-5" style={{ padding: '24px' }}>
+                        <div style={{ fontSize: 48, marginBottom: 12 }}>📖</div>
+                        <p className="fw-semibold mb-1">Full Version</p>
+                        <p className="text-muted small mb-3 mx-auto" style={{ maxWidth: 420 }}>
+                          AI akan menjelaskan isi dokumen secara berurutan — setiap {fk === 'pptx' ? 'slide' : fk === 'docx' ? 'bagian utama' : 'halaman'} — lebih panjang dari ringkasan singkat. Butuh sedikit waktu.
+                        </p>
+                        {fullError && (
+                          <div className="alert alert-danger py-2 mb-3 mx-auto" style={{ fontSize: 13, borderRadius: 10, maxWidth: 420 }}>{fullError}</div>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={generateFullVersion}
+                          disabled={fullLoading}
+                        >
+                          {fullLoading ? (
+                            <><span className="spinner-border spinner-border-sm me-2" />Membuat versi lengkap…</>
+                          ) : (
+                            <><i className="bi bi-stars me-2" />Buat Full Version</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : doc.summary ? (
                 <div className="card" style={{ borderRadius: 14 }}>
                   <div className="card-body" style={{ padding: '20px 24px' }}>
                     <div className="d-flex align-items-center gap-2 mb-3">
@@ -234,26 +396,42 @@ export default function PdfDetailPage() {
                     <div
                       className="pdf-summary-content"
                       style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--sh-text)' }}
-                      dangerouslySetInnerHTML={{
-                        __html: doc.summary
-                          // Code blocks dengan bahasa
-                          .replace(/```(\w+)?\n([\s\S]*?)```/g, (_, lang, code) =>
-                            `<pre style="background:var(--sh-hover);border:1px solid var(--sh-border);border-radius:10px;padding:12px 14px;overflow-x:auto;font-size:12.5px;margin:10px 0;"><div style="font-size:10px;color:var(--sh-muted);margin-bottom:6px;font-weight:700;">${lang?.toUpperCase() || 'CODE'}</div><code style="font-family:monospace;color:var(--sh-text);white-space:pre;">${code.replace(/</g,'&lt;').replace(/>/g,'&gt;').trim()}</code></pre>`)
-                          // Inline code
-                          .replace(/`([^`]+)`/g, '<code style="background:var(--sh-hover);border-radius:4px;padding:1px 5px;font-size:12px;font-family:monospace;">$1</code>')
-                          // H2 headers (##)
-                          .replace(/^## (.+)$/gm, '<h6 style="font-weight:700;margin:18px 0 8px;font-size:14px;color:var(--sh-text);display:flex;align-items:center;gap:6px;">$1</h6>')
-                          // Bold
-                          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                          // Bullet points
-                          .replace(/^[-•]\s(.+)$/gm, '<div style="display:flex;gap:8px;margin:4px 0;"><span style="color:#6366f1;flex-shrink:0;">▸</span><span>$1</span></div>')
-                          // Numbered lists
-                          .replace(/^(\d+)\.\s(.+)$/gm, '<div style="display:flex;gap:8px;margin:4px 0;"><span style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">$1</span><span>$2</span></div>')
-                          // Line breaks
-                          .replace(/\n\n/g, '<br/>')
-                          .replace(/\n/g, '<br/>')
-                      }}
+                      dangerouslySetInnerHTML={{ __html: summaryMarkdownToSafeHtml(doc.summary) }}
                     />
+                    {summaryFiguresList.length > 0 && (
+                      <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--sh-border)' }}>
+                        <h6 className="fw-bold mb-3 d-flex align-items-center gap-2" style={{ fontSize: 14 }}>
+                          <span>📎</span> Gambar dalam dokumen
+                        </h6>
+                        <p className="text-muted small mb-3">
+                          Cuplikan visual yang sama dengan sumber ringkasan (disimpan di penyimpanan aman).
+                        </p>
+                        <div className="d-flex flex-column gap-4">
+                          {summaryFiguresList.map((fig, idx) => (
+                            <figure key={`${fig.url}-${idx}`} className="mb-0">
+                              <img
+                                src={fig.url}
+                                alt={fig.caption}
+                                loading="lazy"
+                                decoding="async"
+                                referrerPolicy="no-referrer"
+                                className="w-100"
+                                style={{
+                                  maxHeight: 480,
+                                  objectFit: 'contain',
+                                  borderRadius: 12,
+                                  border: '1px solid var(--sh-border)',
+                                  boxShadow: '0 4px 20px rgba(0,0,0,0.07)',
+                                }}
+                              />
+                              <figcaption className="text-muted small mt-2 text-center" style={{ fontSize: 12 }}>
+                                {fig.caption}
+                              </figcaption>
+                            </figure>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -281,9 +459,9 @@ export default function PdfDetailPage() {
                   <i className="bi bi-patch-question me-1" />Lihat Soal Tantangan
                 </button>
                 <button className="btn btn-outline-success btn-sm" onClick={() => setTab('ask')}>
-                  <i className="bi bi-robot me-1" />Tanya Sesuatu tentang PDF Ini
+                  <i className="bi bi-robot me-1" />Tanya Sesuatu tentang Dokumen Ini
                 </button>
-                {doc.summary && (
+                {summaryView === 'short' && doc.summary && (
                   <button
                     className="btn btn-outline-secondary btn-sm ms-auto"
                     onClick={generateSummary}
@@ -331,7 +509,7 @@ export default function PdfDetailPage() {
                 <div className="text-center py-5 text-muted">
                   <div style={{ fontSize: 48, marginBottom: 12 }}>🎯</div>
                   <p className="fw-semibold mb-1">Belum ada soal tantangan</p>
-                  <p className="small mb-3">Klik "Generate Soal AI" untuk membuat 8 soal otomatis dari isi PDF</p>
+                  <p className="small mb-3">Klik &quot;Generate Soal AI&quot; untuk membuat 8 soal otomatis dari isi dokumen</p>
                   <button className="btn btn-primary" onClick={generateChallenges} disabled={genLoading}>
                     {genLoading ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-stars me-1" />Generate Soal Sekarang</>}
                   </button>
@@ -364,7 +542,7 @@ export default function PdfDetailPage() {
                     <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>Tanya AI tentang "{doc.title}"</span>
                   </div>
                   <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, margin: 0, marginTop: 2 }}>
-                    AI akan menjawab berdasarkan isi PDF ini saja
+                    AI akan menjawab berdasarkan isi dokumen ini
                   </p>
                 </div>
 
@@ -431,7 +609,7 @@ export default function PdfDetailPage() {
                     <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                       <div style={{ padding: '10px 14px', borderRadius: '14px 14px 14px 4px', border: '1px solid var(--sh-border)', background: 'var(--sh-card-bg)', display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span className="spinner-border spinner-border-sm text-primary" style={{ width: 14, height: 14 }} />
-                        <span className="text-muted small">AI sedang membaca PDF…</span>
+                        <span className="text-muted small">AI sedang membaca dokumen…</span>
                       </div>
                     </div>
                   )}
@@ -444,7 +622,7 @@ export default function PdfDetailPage() {
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Tanya sesuatu tentang PDF ini…"
+                      placeholder="Tanya sesuatu tentang dokumen ini…"
                       value={question}
                       onChange={(e) => setQuestion(e.target.value)}
                       disabled={asking}

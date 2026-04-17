@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { callAI } from '@/lib/openrouter'
+import { MARKER_PDF_SCAN, MARKER_VISUAL_EMBEDDED } from '@/lib/document-visual-enrichment'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -30,9 +31,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const hasText = doc.extractedText && doc.extractedText.trim().length > 50
   const context = hasText ? doc.extractedText.slice(0, 40000) : null
 
-  // Deteksi apakah dokumen image-heavy
-  const hasOcrContent = doc.extractedText.includes('=== KONTEN DARI GAMBAR/HALAMAN SCAN ===')
-  const isImageHeavy = !hasText || hasOcrContent
+  const hasVisualContext =
+    doc.extractedText.includes(MARKER_PDF_SCAN) || doc.extractedText.includes(MARKER_VISUAL_EMBEDDED)
+  const isImageHeavy = !hasText || hasVisualContext
 
   const systemPrompt = `Kamu adalah asisten akademik cerdas bernama StudyHub AI yang membantu mahasiswa memahami dokumen "${doc.title}".
 
@@ -48,8 +49,8 @@ CARA MENJAWAB:
 - Untuk konsep yang ada di dokumen tapi perlu penjelasan lebih detail, gunakan pengetahuanmu SAMBIL menyebut "berdasarkan dokumen ini..." atau "untuk melengkapi materi ini..."
 - Jika pertanyaan tentang kode, tampilkan dalam code block yang lengkap dan bisa dijalankan
 - Tolak HANYA jika pertanyaan 100% tidak berkaitan dengan topik dokumen
-- Jika dokumen berisi hasil OCR gambar (kode screenshot dll), analisis dengan cermat
-- Gunakan Bahasa Indonesia yang jelas dan ramah${isImageHeavy ? '\n- PENTING: Dokumen ini mengandung konten berbasis gambar/scan — beberapa informasi mungkin berasal dari OCR otomatis' : ''}
+- Jika dokumen berisi OCR scan, deskripsi diagram, atau ringkasan visual dari gambar Office/PPT, gunakan itu sebagai sumber fakta
+- Gunakan Bahasa Indonesia yang jelas dan ramah${isImageHeavy ? '\n- PENTING: Dokumen ini memuat konten visual (scan, diagram, gambar slide) — padukan teks dengan deskripsi visual di konteks' : ''}
 
 ${context ? `ISI DOKUMEN:\n${context}` : 'CATATAN: Teks dokumen tidak tersedia (mungkin file PDF berbasis gambar murni). Bantu sebisamu berdasarkan judul dokumen dan pengetahuanmu.'}`
 

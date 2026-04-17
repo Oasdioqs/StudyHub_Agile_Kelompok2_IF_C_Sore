@@ -436,6 +436,10 @@ model PdfDocument {
   charCount     Int            @default(0)
   extractedText String         @db.Text
   summary       String?        @db.Text
+  /// Penjelasan lengkap per halaman/slide (generate on demand)
+  summaryFull   String?        @db.Text
+  /// Cuplikan gambar yang diunggah ke Blob untuk ditampilkan di ringkasan: [{ url, caption }]
+  summaryFigures Json?
   status        PdfStatus      @default(PROCESSING)
   deletedAt     DateTime?      // soft-delete: isi = deleted, null = active
   createdAt     DateTime       @default(now())

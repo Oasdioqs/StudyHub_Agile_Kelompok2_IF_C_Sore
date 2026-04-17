@@ -13,8 +13,8 @@ const FREE_FEATURES = [
   { icon: '✅', text: 'Kelas & tugas kelompok (1 kelas)' },
   { icon: '✅', text: 'Flashcard & Pomodoro Timer' },
   { icon: '✅', text: 'Notifikasi reminder (2 interval)' },
-  { icon: '✅', text: 'PDF AI (maks 3 file)' },
-  { icon: '❌', text: 'PDF AI unlimited', muted: true },
+  { icon: '✅', text: 'Dokumen AI — PDF/Word/PPT (maks 3 seumur hidup)' },
+  { icon: '❌', text: 'Dokumen AI unlimited', muted: true },
   { icon: '❌', text: 'Kelas unlimited', muted: true },
   { icon: '❌', text: 'AI Tutor unlimited', muted: true },
   { icon: '❌', text: 'Reminder semua interval (1, 5, 10, 30, 60, 120 menit)', muted: true },
@@ -24,7 +24,7 @@ const FREE_FEATURES = [
 
 const PREMIUM_FEATURES = [
   { icon: '🚀', text: 'Semua fitur Free' },
-  { icon: '📄', text: 'PDF AI unlimited — upload, rangkum, soal, tanya' },
+  { icon: '📄', text: 'Dokumen AI unlimited — PDF, Word, PPTX: rangkum, soal, tanya' },
   { icon: '🤖', text: 'AI Tutor pesan tak terbatas' },
   { icon: '👥', text: 'Bergabung & buat kelas tak terbatas' },
   { icon: '🔔', text: 'Reminder dengan semua interval (1–120 menit)' },
@@ -111,7 +111,7 @@ export default function UpgradePage() {
               {/* Action buttons */}
               <div className="d-flex gap-3 flex-wrap justify-content-center">
                 <Link href="/pdf-library" className="btn btn-warning fw-bold px-4" style={{ borderRadius: 12 }}>
-                  <i className="bi bi-file-earmark-richtext me-2" />Buka PDF AI
+                  <i className="bi bi-file-earmark-richtext me-2" />Buka Dokumen AI
                 </Link>
                 <Link href="/ai-tutor" className="btn btn-outline-warning fw-bold px-4" style={{ borderRadius: 12 }}>
                   <i className="bi bi-robot me-2" />AI Tutor Unlimited
@@ -143,7 +143,7 @@ export default function UpgradePage() {
                     Belajar lebih cerdas,<br />tanpa batas
                   </h2>
                   <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 15, maxWidth: 480, margin: '0 auto 24px' }}>
-                    Upgrade ke Premium dan akses semua fitur AI eksklusif — PDF AI, AI Tutor unlimited, dan banyak lagi.
+                    Upgrade ke Premium dan akses semua fitur AI eksklusif — Dokumen AI, AI Tutor unlimited, dan banyak lagi.
                   </p>
                   <div className="d-inline-flex align-items-end gap-1">
                     <span style={{ fontSize: 40, fontWeight: 800, color: '#fff', lineHeight: 1 }}>Rp 20.000</span>
@@ -233,7 +233,7 @@ export default function UpgradePage() {
                     { q: 'Bagaimana cara pembayaran?', a: 'Saat ini pembayaran dilakukan via transfer bank atau e-wallet (GoPay/OVO/Dana). Setelah konfirmasi transfer, akun akan diupgrade dalam 1×24 jam.' },
                     { q: 'Apakah bisa di-cancel kapan saja?', a: 'Ya, Premium bersifat bulanan. Kamu bisa tidak memperpanjang kapan saja, dan akun akan kembali ke Free setelah periode berakhir.' },
                     { q: 'Data PDF saya aman?', a: 'Ya. Kami hanya menyimpan teks hasil ekstrak untuk keperluan AI. File PDF asli tidak disimpan di server kami.' },
-                    { q: 'Fitur apa yang paling populer di Premium?', a: 'PDF AI Assistant — upload materi kuliah, AI langsung merangkum dan buat soal latihan otomatis.' },
+                    { q: 'Fitur apa yang paling populer di Premium?', a: 'Dokumen AI — upload PDF, Word, atau PPTX; AI merangkum dan buat soal latihan otomatis.' },
                   ].map((item, i) => (
                     <div key={i} className="card" style={{ borderRadius: 12 }}>
                       <div className="card-body py-3">

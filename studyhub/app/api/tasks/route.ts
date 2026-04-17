@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getUserIdFromRequest } from '@/lib/api-session'
 import { db } from '@/lib/db'
 import { createNotificationWithPush } from '@/lib/notification-push'
+
+const CreateTaskSchema = z.object({
+  title: z.string().min(1, 'Judul wajib diisi').max(255),
+  description: z.string().max(2000).optional(),
+  deadline: z.string().datetime({ offset: true }).optional().nullable(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional().default('MEDIUM'),
+  subject: z.string().max(100).optional(),
+})
 
 export async function GET(req: NextRequest) {
   const userId = await getUserIdFromRequest(req)
@@ -97,10 +106,12 @@ export async function POST(req: NextRequest) {
   const userId = await getUserIdFromRequest(req)
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const { title, description, deadline, priority, subject } = body
-
-  if (!title) return NextResponse.json({ error: 'Judul wajib diisi' }, { status: 400 })
+  const rawBody = await req.json().catch(() => null)
+  const parsed = CreateTaskSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
+  }
+  const { title, description, deadline, priority, subject } = parsed.data
 
   const [task] = await db.$transaction([
     db.task.create({

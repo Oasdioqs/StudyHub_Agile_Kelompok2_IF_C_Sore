@@ -49,6 +49,7 @@ export async function callAIVision(
   mimeType: 'image/png' | 'image/jpeg' = 'image/png',
   prompt: string,
   timeoutMs = 25_000,
+  maxTokens = 2000,
 ): Promise<string> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -77,7 +78,7 @@ export async function callAIVision(
             ],
           },
         ],
-        max_tokens: 2000,
+        max_tokens: maxTokens,
         temperature: 0.2,
       }),
     })

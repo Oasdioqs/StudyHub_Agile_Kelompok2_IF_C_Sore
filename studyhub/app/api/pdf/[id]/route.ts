@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { inferDocumentKind } from '@/lib/document-kind'
 
 // ── GET: detail PDF (summary + challenges) ────────────────────────────────────
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -21,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!doc) return NextResponse.json({ error: 'Dokumen tidak ditemukan.' }, { status: 404 })
 
   const { extractedText: _, ...rest } = doc
-  return NextResponse.json(rest)
+  return NextResponse.json({ ...rest, fileKind: inferDocumentKind(doc.fileName) })
 }
 
 // ── DELETE: soft-delete PDF (tidak kurangi lifetime counter) ──────────────────

@@ -96,8 +96,6 @@ export async function POST(req: Request) {
     `,
     })
 
-    console.log('RESET LINK:', link)
-
     return NextResponse.json({ message: 'Link reset dikirim', messageId: result.messageId })
   } catch (error: any) {
     console.error('MAIL SEND ERROR:', error)
