@@ -7,10 +7,16 @@ import { checkRateLimit, RATE_LIMITS, rateLimitResponse } from '@/lib/rate-limit
 
 const FREE_DAILY_LIMIT = 10
 
-// Model priority: gunakan env var jika ada, fallback ke model gratis terbaik
-// google/gemini-2.0-flash-exp:free — gratis, cepat, sangat capable
-// deepseek/deepseek-r1:free — kalau available, reasoning terbaik
-const AI_MODEL = process.env.OPENROUTER_MODEL || 'google/gemini-2.0-flash-exp:free'
+// Model dengan fallback otomatis — jika satu down, coba berikutnya
+const FREE_MODELS = [
+  'minimax/minimax-m2.5:free',          // MiniMax M2.5 — dicoba user
+  'qwen/qwq-32b:free',                   // QwQ — reasoning bagus
+  'deepseek/deepseek-chat-v3-0324:free', // DeepSeek Chat V3
+  'meta-llama/llama-3.3-70b-instruct:free', // Llama 3.3 70B
+  'google/gemma-3-27b-it:free',          // Gemma 3
+  'mistralai/mistral-7b-instruct:free',  // Fallback terakhir
+]
+const AI_MODEL = process.env.OPENROUTER_MODEL || FREE_MODELS[0]
 
 type SimpleMessage = { role: 'user' | 'assistant'; content: string }
 type AttachmentPayload = { type: 'image' | 'text' | 'file'; name?: string; content?: string; mimeType?: string }
@@ -293,8 +299,8 @@ ${groupMemberships.length > 0 ? groupMemberships.map(g => `- ${g.group.name}${g.
 📣 PENGUMUMAN KELAS TERBARU:
 ${classAnnouncements.length > 0 ? classAnnouncements.map((a: any) => `- [${a.group.name}] "${a.title}": ${a.message?.slice(0, 120) || '-'}`).join('\n') : 'Tidak ada pengumuman.'}
 
-📓 CATATAN (${notes.length}) — judul + isi singkat:
-${notes.length > 0 ? notes.map(n => `- [ID:${n.id}] "${n.title}"${n.tags.length > 0 ? ` #${n.tags.join(' #')}` : ''}\n  Isi: ${String(n.content || '').slice(0, 200).replace(/\n/g, ' ')}...`).join('\n') : 'Belum ada catatan.'}
+📓 CATATAN (${notes.length}) — dengan tanggal update:
+${notes.length > 0 ? notes.map(n => `- [ID:${n.id}] "${n.title}" | Diupdate: ${new Date(new Date(n.updatedAt).getTime() + 7*3600000).toISOString().slice(0, 10)}${n.tags.length > 0 ? ` | #${n.tags.join(' #')}` : ''}\n  Isi: ${String(n.content || '').slice(0, 200).replace(/\n/g, ' ')}...`).join('\n') : 'Belum ada catatan.'}
 
 🃏 FLASHCARD SETS:
 ${flashcardSets.length > 0 ? flashcardSets.map(f => `- "${f.title}"${f.subject ? ` (${f.subject})` : ''} — ${f._count.flashcards} kartu`).join('\n') : 'Belum ada.'}
@@ -342,8 +348,10 @@ ${unreadNotifs.length > 0 ? unreadNotifs.map(n => `- ${n.title}: ${n.message.sli
     // ── Waktu sekarang dalam WIB (UTC+7) ──────────────────────────────────────
     const nowWIB = new Date(Date.now() + 7 * 3600 * 1000)
     const todayISO = nowWIB.toISOString().slice(0, 10)
+    const kemarin = new Date(nowWIB.getTime() - 86400000).toISOString().slice(0, 10)
     const tomorrowISO = new Date(nowWIB.getTime() + 86400000).toISOString().slice(0, 10)
     const lusaISO = new Date(nowWIB.getTime() + 2 * 86400000).toISOString().slice(0, 10)
+    const nextWeekISO = new Date(nowWIB.getTime() + 7 * 86400000).toISOString().slice(0, 10)
     const dayNow = dayNames[nowWIB.getUTCDay()]
     const timeNow = nowWIB.toISOString().slice(11, 16)
     const nextMondayISO = (() => {
@@ -358,8 +366,11 @@ Kamu bukan chatbot generik — kamu tahu semua data belajar ${userName} real-tim
 
 # Waktu Sekarang (WIB)
 - Hari & Tanggal: **${dayNow}, ${todayISO}** | Jam: ${timeNow} WIB
-- Besok: ${tomorrowISO} | Lusa: ${lusaISO} | Senin depan: ${nextMondayISO}
-- Gunakan ini untuk hitung deadline relatif: "besok" = ${tomorrowISO}, "lusa" = ${lusaISO}, "minggu depan Senin" = ${nextMondayISO}
+- Kemarin/semalem: ${kemarin}
+- Besok: ${tomorrowISO} | Lusa: ${lusaISO}
+- Minggu depan (7 hari): ${nextWeekISO} | Senin depan: ${nextMondayISO}
+- "Semalem/kemarin" = ${kemarin} | "besok" = ${tomorrowISO} | "lusa" = ${lusaISO}
+- "Minggu depan" = sekitar ${nextWeekISO} | "Jumat ini" = hitung dari ${todayISO}
 - Default jam deadline jika tidak disebutkan: **23:59:00**
 
 # Gaya Komunikasi
@@ -543,24 +554,46 @@ ${contextStr}`
       })),
     ].filter((m) => !!m.content)
 
-    const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'HTTP-Referer': process.env.NEXTAUTH_URL || 'https://studyhub.vercel.app',
-        'X-Title': 'StudyHub AI Tutor',
-      },
-      body: JSON.stringify({ model: AI_MODEL, messages: aiMessages }),
-    })
+    // Coba model satu per satu — fallback otomatis jika 404
+    const modelsToTry = process.env.OPENROUTER_MODEL
+      ? [process.env.OPENROUTER_MODEL]
+      : FREE_MODELS
 
-    if (!aiRes.ok) {
-      const err = await aiRes.text()
-      console.error('OpenRouter Error:', err)
-      return NextResponse.json({ error: 'AI Error: ' + err }, { status: 500 })
+    let aiData: any = null
+    let lastErr = ''
+
+    for (const model of modelsToTry) {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'HTTP-Referer': process.env.NEXTAUTH_URL || 'https://studyhub.vercel.app',
+          'X-Title': 'StudyHub AI Tutor',
+        },
+        body: JSON.stringify({ model, messages: aiMessages }),
+      })
+
+      if (res.ok) {
+        aiData = await res.json()
+        break
+      }
+
+      const errText = await res.text()
+      lastErr = errText
+      // Jika 404 (model not found) → coba model berikutnya
+      if (res.status === 404 || res.status === 503) continue
+      // Error lain (auth, dll) → langsung berhenti
+      return NextResponse.json({ error: `AI Error: ${errText}` }, { status: 500 })
     }
 
-    const aiData = await aiRes.json()
+    if (!aiData) {
+      return NextResponse.json(
+        { error: 'Semua model AI sedang tidak tersedia. Coba lagi sebentar. ' + lastErr },
+        { status: 503 },
+      )
+    }
+
     const reply: string = aiData.choices?.[0]?.message?.content || 'Maaf, aku sedang tidak bisa memberi jawaban.'
 
     // Simpan ke DB
