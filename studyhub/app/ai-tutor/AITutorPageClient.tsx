@@ -1271,11 +1271,17 @@ export default function AITutorPageClient() {
 
           
           <div className="border-bottom ai-surface px-4 py-3 d-flex justify-content-between align-items-center flex-shrink-0 ai-chat-toolbar">
-            <div>
-              <h6 className="mb-0 fw-bold">
-                <i className="bi bi-robot me-2 text-primary"></i>StudyHub Bot
-              </h6>
-              <small className="text-muted">Powered by StudyHub | Create by Bryan</small>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(79,70,229,0.35)', flexShrink: 0 }}>
+                <i className="bi bi-robot" style={{ color: '#fff', fontSize: 16 }} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--sh-text)', letterSpacing: '-0.01em', lineHeight: 1.2 }}>StudyHub AI</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80' }} />
+                  <span style={{ fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600 }}>Online · DeepSeek R1</span>
+                </div>
+              </div>
             </div>
             <div className="d-flex align-items-center gap-2">
               <div className="ai-mode-wrap">
@@ -1761,9 +1767,11 @@ export default function AITutorPageClient() {
       <style jsx global>{`
         .chat-bg {
           background:
-            radial-gradient(circle at 12% 8%, rgba(99,102,241,0.08) 0, transparent 28%),
-            radial-gradient(circle at 88% 92%, rgba(14,165,233,0.08) 0, transparent 30%),
-            #f8fafc;
+            radial-gradient(ellipse 60% 50% at 20% 30%, rgba(79,70,229,0.07) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 40% at 80% 70%, rgba(14,165,233,0.06) 0%, transparent 55%),
+            radial-gradient(ellipse 40% 35% at 60% 10%, rgba(124,58,237,0.05) 0%, transparent 50%),
+            var(--sh-bg);
+          background-attachment: fixed;
         }
         .ai-surface {
           background: var(--sh-card-bg);
@@ -1791,28 +1799,29 @@ export default function AITutorPageClient() {
 
         
         .chat-bubble-user {
-          background: #4f46e5;
+          background: linear-gradient(135deg, #4f46e5, #7c3aed);
           color: white;
-          border-radius: 18px 18px 6px 18px;
-          border: 1px solid rgba(255,255,255,0.22);
-          box-shadow: 0 8px 20px rgba(79,70,229,0.22);
+          border-radius: 20px 20px 6px 20px;
+          border: 1px solid rgba(255,255,255,0.15);
+          box-shadow: 0 8px 24px rgba(79,70,229,0.30), 0 2px 8px rgba(79,70,229,0.15);
           max-width: min(76%, 720px);
-          transition: box-shadow 0.18s ease;
+          transition: box-shadow 0.2s ease, transform 0.2s ease;
           padding-right: 42px !important;
         }
 
         .chat-bubble-user:hover {
-          box-shadow: 0 10px 22px rgba(79,70,229,0.28);
+          box-shadow: 0 12px 32px rgba(79,70,229,0.38);
+          transform: translateY(-1px);
         }
 
-        
         .chat-bubble-ai {
-          background: #ffffff;
-          color: #0f172a;
-          border-radius: 18px 18px 18px 6px;
-          box-shadow: 0 6px 18px rgba(15,23,42,0.06);
-          border: 1px solid #e2e8f0;
+          background: var(--sh-card-bg);
+          color: var(--sh-text);
+          border-radius: 20px 20px 20px 6px;
+          box-shadow: 0 4px 20px rgba(15,23,42,0.06), 0 1px 4px rgba(15,23,42,0.04);
+          border: 1px solid var(--sh-border);
           max-width: min(82%, 760px);
+          backdrop-filter: blur(8px);
         }
 
         
@@ -2850,14 +2859,21 @@ export default function AITutorPageClient() {
         }
         :root[data-theme='dark'] .chat-bg {
           background:
-            radial-gradient(circle at 12% 8%, rgba(99,102,241,0.18) 0, transparent 32%),
-            radial-gradient(circle at 88% 92%, rgba(14,165,233,0.16) 0, transparent 34%),
-            #0b1220;
+            radial-gradient(ellipse 60% 50% at 20% 30%, rgba(79,70,229,0.14) 0%, transparent 60%),
+            radial-gradient(ellipse 50% 40% at 80% 70%, rgba(14,165,233,0.10) 0%, transparent 55%),
+            radial-gradient(ellipse 40% 35% at 60% 10%, rgba(124,58,237,0.10) 0%, transparent 50%),
+            #080b14;
+          background-attachment: fixed;
         }
         :root[data-theme='dark'] .chat-bubble-ai {
-          background: color-mix(in srgb, var(--sh-card-bg) 92%, #0f172a 8%);
+          background: rgba(17,24,39,0.85);
           color: var(--sh-text);
-          border-color: var(--sh-border);
+          border-color: rgba(255,255,255,0.07);
+          backdrop-filter: blur(16px);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2);
+        }
+        :root[data-theme='dark'] .chat-bubble-user {
+          box-shadow: 0 8px 28px rgba(79,70,229,0.4), 0 2px 8px rgba(79,70,229,0.2);
         }
         :root[data-theme='dark'] .chat-composer-input,
         :root[data-theme='dark'] .chat-tools-menu-item,
