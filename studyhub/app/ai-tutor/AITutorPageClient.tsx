@@ -190,6 +190,88 @@ export default function AITutorPageClient() {
     router.replace('/ai-tutor')
   }, [router, searchParams])
 
+  // ── Action System: parse & execute [STUDYHUB_ACTION:{...}] dari AI ──────────
+  const executeActions = async (reply: string): Promise<string> => {
+    const actionRegex = /\[STUDYHUB_ACTION:(\{[^[\]]+\})\]/g
+    const actions: Array<{ type: string; data: Record<string, any> }> = []
+    let match: RegExpExecArray | null
+
+    while ((match = actionRegex.exec(reply)) !== null) {
+      try {
+        const parsed = JSON.parse(match[1])
+        if (parsed?.type) actions.push(parsed)
+      } catch { /* skip invalid */ }
+    }
+
+    // Strip action blocks from display text
+    const cleanReply = reply.replace(/\[STUDYHUB_ACTION:\{[^[\]]+\}\]/g, '').trim()
+
+    if (actions.length === 0) return cleanReply
+
+    // Execute each action
+    const results: string[] = []
+    for (const action of actions) {
+      try {
+        let res: Response
+        let msg = ''
+
+        switch (action.type) {
+          case 'create_task':
+            res = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action.data) })
+            msg = res.ok ? `✅ Tugas **"${action.data.title}"** berhasil dibuat!` : `❌ Gagal buat tugas: ${(await res.json()).error}`
+            break
+
+          case 'edit_task':
+            res = await fetch(`/api/tasks/${action.data.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action.data) })
+            msg = res.ok ? `✅ Tugas **"${action.data.title || action.data.id}"** berhasil diupdate!` : `❌ Gagal update tugas`
+            break
+
+          case 'delete_task':
+            res = await fetch(`/api/tasks/${action.data.id}`, { method: 'DELETE' })
+            msg = res.ok ? `🗑️ Tugas **"${action.data.title}"** berhasil dihapus.` : `❌ Gagal hapus tugas`
+            break
+
+          case 'create_note':
+            res = await fetch('/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action.data) })
+            msg = res.ok ? `✅ Catatan **"${action.data.title}"** berhasil dibuat!` : `❌ Gagal buat catatan`
+            break
+
+          case 'create_schedule': {
+            // GET current slots, tambah slot baru, PUT semua kembali
+            const currRes = await fetch('/api/schedule')
+            const currData = currRes.ok ? await currRes.json() : { slots: [] }
+            const currentSlots = currData.slots || []
+            const newSlots = [...currentSlots, action.data]
+            res = await fetch('/api/schedule', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slots: newSlots }) })
+            msg = res.ok ? `✅ Jadwal **"${action.data.title}"** berhasil ditambahkan!` : `❌ Gagal tambah jadwal`
+            break
+          }
+
+          case 'delete_schedule': {
+            // GET current slots, hapus yang sesuai ID, PUT sisanya
+            const currRes2 = await fetch('/api/schedule')
+            const currData2 = currRes2.ok ? await currRes2.json() : { slots: [] }
+            const filteredSlots = (currData2.slots || []).filter((s: any) => s.id !== action.data.id)
+            res = await fetch('/api/schedule', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slots: filteredSlots }) })
+            msg = res.ok ? `🗑️ Jadwal berhasil dihapus.` : `❌ Gagal hapus jadwal`
+            break
+          }
+
+          default:
+            continue
+        }
+        results.push(msg)
+      } catch {
+        results.push(`❌ Gagal eksekusi aksi: ${action.type}`)
+      }
+    }
+
+    if (results.length > 0) {
+      return cleanReply + '\n\n' + results.join('\n')
+    }
+    return cleanReply
+  }
+
   const sendMessageText = async (
     text: string,
     opts?: {
@@ -246,7 +328,9 @@ export default function AITutorPageClient() {
       } else {
         setMessages(prev => [...prev, { role: 'assistant', content: '' }])
       }
-      const fullReply: string = data.reply || ''
+      const rawReply: string = data.reply || ''
+      // Parse & execute actions, get clean display text
+      const fullReply = await executeActions(rawReply)
       let current = ''
       for (let i = 0; i < fullReply.length; i += 1) {
         if (stopTypingRef.current) break

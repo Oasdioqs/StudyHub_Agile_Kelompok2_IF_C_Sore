@@ -157,14 +157,14 @@ export async function POST(req: NextRequest) {
       tasks, completedTasks, schedule, stats, profile,
       notes, flashcardSets, timerStats,
       forumThreads, groupMemberships, classTasks,
-      unreadNotifs,
+      unreadNotifs, pdfDocs, videoSummaries, classAnnouncements,
     ] = await Promise.all([
-      // Tugas pribadi belum selesai
+      // Tugas pribadi belum selesai (include ID untuk actions)
       db.task.findMany({
         where: { userId, status: { not: 'DONE' } },
-        select: { id: true, title: true, deadline: true, priority: true, subject: true, status: true },
+        select: { id: true, title: true, deadline: true, priority: true, subject: true, status: true, description: true },
         orderBy: { deadline: 'asc' },
-        take: 15,
+        take: 20,
       }),
       // Tugas pribadi yang sudah selesai (terbaru)
       db.task.findMany({
@@ -173,10 +173,10 @@ export async function POST(req: NextRequest) {
         orderBy: { updatedAt: 'desc' },
         take: 10,
       }),
-      // Jadwal mingguan
+      // Jadwal mingguan (include ID untuk actions)
       db.weeklyScheduleSlot.findMany({
         where: { userId },
-        select: { dayOfWeek: true, title: true, startTime: true, endTime: true, place: true },
+        select: { id: true, dayOfWeek: true, title: true, startTime: true, endTime: true, place: true },
         orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
       }),
       // Progress dashboard hari ini
@@ -190,12 +190,12 @@ export async function POST(req: NextRequest) {
         where: { id: userId },
         select: { name: true, points: true, streak: true, institution: true, major: true },
       }),
-      // Catatan terbaru
+      // Catatan — include konten (dipotong 500 char)
       db.note.findMany({
         where: { userId },
         orderBy: { updatedAt: 'desc' },
-        take: 5,
-        select: { id: true, title: true, tags: true, updatedAt: true },
+        take: 8,
+        select: { id: true, title: true, content: true, tags: true, updatedAt: true },
       }),
       // Flashcard sets
       db.flashcardSet.findMany({
@@ -238,51 +238,77 @@ export async function POST(req: NextRequest) {
         take: 5,
         select: { title: true, message: true, type: true },
       }),
+      // PDF Library
+      db.pdfDocument.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 8,
+        select: { id: true, title: true, createdAt: true },
+      }).catch(() => [] as any[]),
+      // Video Summaries
+      db.videoSummary.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { id: true, title: true, createdAt: true },
+      }).catch(() => [] as any[]),
+      // Pengumuman kelas terbaru
+      db.classAnnouncement.findMany({
+        where: { group: { members: { some: { userId } } } },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { title: true, message: true, createdAt: true, group: { select: { name: true } } },
+      }).catch(() => [] as any[]),
     ])
 
     const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
     const totalStudyMinutes = Math.round((timerStats._sum.duration || 0) / 60)
 
+    const fmt = (d: Date | string | null | undefined) =>
+      d ? new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Tanpa deadline'
+
     const contextStr = `
-=== KONTEKS USER SAAT INI ===
-User: ${profile?.name || 'User'} | Poin: ${profile?.points} | Streak: ${profile?.streak} hari
-${profile?.institution ? `Kampus/Sekolah: ${profile.institution}` : ''}${profile?.major ? ` | Jurusan: ${profile.major}` : ''}
+=== DATA REAL-TIME ${(profile?.name || 'User').toUpperCase()} ===
+👤 Profil: ${profile?.name} | Poin: ${profile?.points} | Streak: ${profile?.streak} hari${profile?.institution ? ` | ${profile.institution}` : ''}${profile?.major ? ` — ${profile.major}` : ''}
 
-📋 TUGAS PRIBADI (${tasks.length} belum selesai):
-${tasks.length > 0 ? tasks.map(t => `- ${t.title} [${t.priority}${t.subject ? `, ${t.subject}` : ''}] ${t.status === 'IN_PROGRESS' ? '(Sedang dikerjakan)' : ''} DL: ${t.deadline ? new Date(t.deadline).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Tanpa deadline'}`).join('\n') : 'Tidak ada tugas aktif.'}
+📊 PROGRESS HARI INI: ${stats?.doneTasks || 0}/${stats?.totalTasks || 0} tugas selesai (${stats?.progress || 0}%) | Overdue: ${stats?.overdueTasks || 0}
+⏱️ BELAJAR MINGGU INI: ${timerStats._count || 0} sesi Pomodoro | ${totalStudyMinutes} menit (${(totalStudyMinutes / 60).toFixed(1)} jam)
 
-✅ TUGAS SELESAI (${completedTasks.length} terakhir):
-${completedTasks.length > 0 ? completedTasks.map(t => `- ${t.title}${t.subject ? ` [${t.subject}]` : ''} — selesai ${new Date(t.updatedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`).join('\n') : 'Belum ada tugas yang diselesaikan.'}
+📋 TUGAS PRIBADI AKTIF (${tasks.length}):
+${tasks.length > 0 ? tasks.map(t => `- [ID:${t.id}] "${t.title}" | Status:${t.status} | Prioritas:${t.priority}${t.subject ? ` | Mapel:${t.subject}` : ''} | DL:${fmt(t.deadline)}`).join('\n') : 'Tidak ada tugas aktif.'}
 
-📚 TUGAS KELAS (${classTasks.length} mendatang):
-${classTasks.length > 0 ? classTasks.map(t => `- [${t.group.name}] ${t.title} [${t.priority}] DL: ${t.deadline ? new Date(t.deadline).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'}`).join('\n') : 'Tidak ada tugas kelas.'}
+✅ TUGAS SELESAI TERBARU:
+${completedTasks.length > 0 ? completedTasks.map(t => `- [ID:${t.id}] "${t.title}"${t.subject ? ` [${t.subject}]` : ''} — ${fmt(t.updatedAt)}`).join('\n') : 'Belum ada.'}
 
-📅 JADWAL MINGGUAN:
-${schedule.length > 0 ? schedule.map(s => `- ${dayNames[s.dayOfWeek]}: ${s.title} (${s.startTime || '?'}${s.endTime ? '-' + s.endTime : ''})${s.place ? ' @ ' + s.place : ''}`).join('\n') : 'Belum ada jadwal.'}
+📚 TUGAS KELAS MENDATANG (${classTasks.length}):
+${classTasks.length > 0 ? classTasks.map(t => `- [${t.group.name}] "${t.title}" | ${t.priority} | DL:${fmt(t.deadline)}`).join('\n') : 'Tidak ada.'}
 
-🏫 KELAS DIIKUTI (${groupMemberships.length}):
+📅 JADWAL MINGGUAN PRIBADI:
+${schedule.length > 0 ? schedule.map(s => `- [ID:${s.id}] ${dayNames[s.dayOfWeek]}: "${s.title}" | ${s.startTime || '?'}-${s.endTime || '?'}${s.place ? ` @ ${s.place}` : ''}`).join('\n') : 'Belum ada jadwal.'}
+
+🏫 KELAS (${groupMemberships.length}):
 ${groupMemberships.length > 0 ? groupMemberships.map(g => `- ${g.group.name}${g.group.subject ? ` (${g.group.subject})` : ''} [${g.role === 'ADMIN' ? 'Komisaris' : 'Anggota'}]`).join('\n') : 'Belum bergabung kelas.'}
 
-📓 CATATAN TERBARU (${notes.length}):
-${notes.length > 0 ? notes.map(n => `- "${n.title}"${n.tags.length > 0 ? ` [${n.tags.join(', ')}]` : ''}`).join('\n') : 'Belum ada catatan.'}
+📣 PENGUMUMAN KELAS TERBARU:
+${classAnnouncements.length > 0 ? classAnnouncements.map((a: any) => `- [${a.group.name}] "${a.title}": ${a.message?.slice(0, 120) || '-'}`).join('\n') : 'Tidak ada pengumuman.'}
 
-🃏 FLASHCARD SETS (${flashcardSets.length}):
-${flashcardSets.length > 0 ? flashcardSets.map(f => `- "${f.title}"${f.subject ? ` (${f.subject})` : ''} — ${f._count.flashcards} kartu`).join('\n') : 'Belum ada flashcard.'}
+📓 CATATAN (${notes.length}) — judul + isi singkat:
+${notes.length > 0 ? notes.map(n => `- [ID:${n.id}] "${n.title}"${n.tags.length > 0 ? ` #${n.tags.join(' #')}` : ''}\n  Isi: ${String(n.content || '').slice(0, 200).replace(/\n/g, ' ')}...`).join('\n') : 'Belum ada catatan.'}
 
-⏱️ STATISTIK BELAJAR (Minggu Ini):
-- Sesi Pomodoro: ${timerStats._count || 0} sesi
-- Total Durasi: ${totalStudyMinutes} menit (${(totalStudyMinutes / 60).toFixed(1)} jam)
+🃏 FLASHCARD SETS:
+${flashcardSets.length > 0 ? flashcardSets.map(f => `- "${f.title}"${f.subject ? ` (${f.subject})` : ''} — ${f._count.flashcards} kartu`).join('\n') : 'Belum ada.'}
 
-💬 FORUM (Thread Terbaru):
-${forumThreads.length > 0 ? forumThreads.map(t => `- "${t.title}"${t.subject ? ` [${t.subject}]` : ''} — ${t.upvotes} upvote, ${t._count.replies} balasan`).join('\n') : 'Belum ada thread.'}
+📄 PDF LIBRARY (${pdfDocs.length}):
+${pdfDocs.length > 0 ? pdfDocs.map((p: any) => `- "${p.title}"`).join('\n') : 'Belum ada PDF.'}
 
-📊 PROGRESS HARI INI:
-- Total Tugas: ${stats?.totalTasks || 0} | Selesai: ${stats?.doneTasks || 0} | Overdue: ${stats?.overdueTasks || 0}
-- Progress: ${stats?.progress || 0}%
+🎬 VIDEO SUMMARY (${videoSummaries.length}):
+${videoSummaries.length > 0 ? videoSummaries.map((v: any) => `- "${v.title}"`).join('\n') : 'Belum ada.'}
 
-🔔 NOTIFIKASI BELUM DIBACA (${unreadNotifs.length}):
-${unreadNotifs.length > 0 ? unreadNotifs.map(n => `- [${n.type}] ${n.title}: ${n.message.slice(0, 60)}`).join('\n') : 'Semua notifikasi sudah dibaca.'}
-=============================`.trim()
+💬 FORUM: ${forumThreads.length > 0 ? forumThreads.map(t => `"${t.title}" (${t.upvotes} upvote)`).join(', ') : 'Belum ada thread.'}
+
+🔔 NOTIFIKASI BELUM DIBACA:
+${unreadNotifs.length > 0 ? unreadNotifs.map(n => `- ${n.title}: ${n.message.slice(0, 80)}`).join('\n') : 'Semua sudah dibaca.'}
+================`.trim()
 
     // Mode prompt adjustment
     const modeInstruction = mode === 'detail'
@@ -380,6 +406,51 @@ Jawab langsung dengan penjelasan yang clear, pakai bullet jika ada langkah-langk
 - [🏫 Kelas](/kelas) — tugas & info kelas
 - [📊 Analitik](/analytics) — statistik belajar
 - [🏆 Leaderboard](/leaderboard) — peringkat
+
+# ⚡ ACTION SYSTEM — Kamu bisa eksekusi aksi langsung!
+
+Ketika user minta buat/edit/hapus tugas, catatan, atau jadwal — LAKUKAN LANGSUNG dengan menambahkan action block di akhir responmu.
+
+## Format Action Block:
+\`\`\`
+[STUDYHUB_ACTION:{"type":"...","data":{...}}]
+\`\`\`
+
+## Actions yang tersedia:
+
+### Tugas
+- Buat tugas baru:
+  [STUDYHUB_ACTION:{"type":"create_task","data":{"title":"...","subject":"...","deadline":"2026-04-20T23:59:00","priority":"HIGH|MEDIUM|LOW","description":"..."}}]
+
+- Edit tugas (gunakan ID dari konteks):
+  [STUDYHUB_ACTION:{"type":"edit_task","data":{"id":"...","title":"...","status":"TODO|IN_PROGRESS|DONE","priority":"HIGH|MEDIUM|LOW","deadline":"..."}}]
+
+- Hapus tugas:
+  [STUDYHUB_ACTION:{"type":"delete_task","data":{"id":"...","title":"..."}}]
+
+### Catatan
+- Buat catatan baru:
+  [STUDYHUB_ACTION:{"type":"create_note","data":{"title":"...","content":"...","tags":["tag1","tag2"]}}]
+
+### Jadwal
+- Tambah jadwal:
+  [STUDYHUB_ACTION:{"type":"create_schedule","data":{"dayOfWeek":1,"title":"...","startTime":"08:00","endTime":"10:00","place":"..."}}]
+
+- Hapus jadwal:
+  [STUDYHUB_ACTION:{"type":"delete_schedule","data":{"id":"..."}}]
+
+## Aturan Action:
+1. Selalu konfirmasi dulu sebelum hapus ("Aku akan hapus tugas X, yakin?") KECUALI user sudah jelas minta hapus
+2. Untuk buat/edit, langsung eksekusi tanpa tanya lagi jika detailnya sudah jelas
+3. Deadline format: ISO 8601 (contoh: "2026-04-20T23:59:00")
+4. dayOfWeek: 0=Minggu, 1=Senin, 2=Selasa, 3=Rabu, 4=Kamis, 5=Jumat, 6=Sabtu
+5. Taruh action block di BARIS PALING AKHIR respons, setelah teks konfirmasi
+6. Boleh multiple actions dalam satu respons
+
+## Contoh percakapan:
+User: "tambah tugas UTS Algoritma deadline besok jam 11 malam"
+AI: "Siap! Aku tambahkan tugas UTS Algoritma sekarang 📋"
+[STUDYHUB_ACTION:{"type":"create_task","data":{"title":"UTS Algoritma","deadline":"${new Date(Date.now() + 86400000).toISOString().slice(0, 10)}T23:00:00","priority":"HIGH","subject":"Algoritma"}}]
 
 # Konteks Real-Time ${userName}
 ${contextStr}`
