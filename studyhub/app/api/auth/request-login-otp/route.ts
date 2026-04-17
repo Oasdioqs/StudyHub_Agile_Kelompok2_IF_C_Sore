@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import { sendEmail, resendVerificationEmail } from '@/lib/mail'
+import { sendOtpEmail, resendVerificationEmail } from '@/lib/mail'
 import { db } from '@/lib/db'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
@@ -192,54 +192,7 @@ export async function POST(req: NextRequest) {
       },
     }))
 
-    const sendResult = await sendWithTimeout(sendEmail({
-    to: userEmail,
-    subject: 'Login Verification Code - StudyHub',
-    html: `
-      <!doctype html>
-      <html>
-        <body style="margin:0; padding:0; background:#f6f7fb;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;">
-            <tr>
-              <td align="center" style="padding:32px 16px;">
-                <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%; max-width:600px; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(17,24,39,0.08);">
-                  <tr>
-                    <td style="padding:26px 24px 10px;">
-                      <div style="font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:#6b7280; font-size:13px; font-weight:700; letter-spacing:0.02em;">
-                        STUDYHUB
-                      </div>
-                      <h1 style="margin:12px 0 0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:20px; line-height:1.3; color:#111827;">
-                        Kode Verifikasi Login
-                      </h1>
-                      <p style="margin:10px 0 0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:14px; line-height:1.6; color:#4b5563;">
-                        Masukkan kode berikut untuk menyelesaikan login. Kode berlaku selama <b>10 menit</b>.
-                        <br />
-                        Kode ini hanya bisa dipakai sekali untuk login kali ini.
-                      </p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding:10px 24px 26px;">
-                      <div style="font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:28px; font-weight:800; letter-spacing:0.12em; color:#4f46e5; background:#eef2ff; border-radius:12px; padding:18px; text-align:center;">
-                        ${otp}
-                      </div>
-                      <p style="margin:14px 0 0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:12.5px; line-height:1.6; color:#9ca3af;">
-                        Jangan pernah share kode OTP ini ke siapa pun.
-                      </p>
-
-                      <p style="margin:10px 0 0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; font-size:12.5px; line-height:1.6; color:#9ca3af;">
-                        Jika kamu tidak meminta kode ini, abaikan email ini.
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-      </html>
-    `
-    }), EMAIL_SEND_TIMEOUT_MS)
+    const sendResult = await sendWithTimeout(sendOtpEmail(userEmail, otp), EMAIL_SEND_TIMEOUT_MS)
 
     if (sendResult.timedOut) {
       const res = NextResponse.json({ message: 'OTP sedang diproses pengirimannya. Cek email dalam beberapa detik.' })

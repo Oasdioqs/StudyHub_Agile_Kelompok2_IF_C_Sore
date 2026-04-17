@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { OnboardingModal } from './OnboardingModal'
 
 interface OnboardingGateProps {
@@ -9,10 +10,10 @@ interface OnboardingGateProps {
 
 export function OnboardingGate({ onboardingDone }: OnboardingGateProps) {
   const [showModal, setShowModal] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     if (!onboardingDone) {
-      // Small delay so dashboard loads first (better UX)
       const t = setTimeout(() => setShowModal(true), 600)
       return () => clearTimeout(t)
     }
@@ -20,5 +21,13 @@ export function OnboardingGate({ onboardingDone }: OnboardingGateProps) {
 
   if (!showModal) return null
 
-  return <OnboardingModal onComplete={() => setShowModal(false)} />
+  return (
+    <OnboardingModal
+      onComplete={() => {
+        setShowModal(false)
+        // Refresh server component supaya onboardingDone terbaca true dari DB
+        router.refresh()
+      }}
+    />
+  )
 }

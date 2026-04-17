@@ -1,22 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
   <defs>
-    <linearGradient id="grad1" x1="0" y1="0" x2="1" y2="1">
+    <!-- Main gradient: indigo → purple (sesuai warna StudyHub) -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#4f46e5"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
+      <stop offset="60%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
     </linearGradient>
-    <linearGradient id="grad2" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#818cf8"/>
-      <stop offset="100%" stop-color="#a78bfa"/>
+    <!-- Glass shine di bagian atas -->
+    <linearGradient id="shine" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="white" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
     </linearGradient>
+    <!-- Subtle inner shadow -->
+    <filter id="inner" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="0.8" result="blur"/>
+    </filter>
   </defs>
-  <!-- book body left page -->
-  <path d="M6 10C6 8.343 7.343 7 9 7H22V38H9C7.343 38 6 36.657 6 35V10Z" fill="url(#grad1)"/>
-  <!-- book body right page -->
-  <path d="M42 10C42 8.343 40.657 7 39 7H26V38H39C40.657 38 42 36.657 42 35V10Z" fill="url(#grad2)" opacity="0.85"/>
-  <!-- spine -->
-  <rect x="22" y="7" width="4" height="31" fill="white" opacity="0.3"/>
-  <!-- book base -->
-  <path d="M6 35C6 36.657 7.343 38 9 38H39C40.657 38 42 36.657 42 35V37C42 38.657 40.657 40 39 40H9C7.343 40 6 38.657 6 37V35Z" fill="url(#grad1)" opacity="0.5"/>
-  <!-- lightning bolt spark -->
-  <path d="M27.5 14L21 24H25.5L20.5 34L30 22H25L27.5 14Z" fill="white" opacity="0.95"/>
+
+  <!-- Background rounded square -->
+  <rect width="48" height="48" rx="12" fill="url(#bg)"/>
+
+  <!-- Glass highlight (top half) -->
+  <path d="M0 12 Q0 0 12 0 L36 0 Q48 0 48 12 L48 26 Q36 20 24 20 Q12 20 0 26 Z" fill="url(#shine)"/>
+
+  <!-- Huruf S — custom stroke path -->
+  <!-- Top arc: kanan → kiri -->
+  <!-- Middle: kiri → kanan -->
+  <!-- Bottom arc: kanan → kiri -->
+  <path
+    d="M 33 14
+       C 33 7, 14 7, 14 17
+       C 14 24, 34 22, 34 31
+       C 34 41, 15 41, 15 34"
+    stroke="white"
+    stroke-width="4.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+    opacity="0.97"
+  />
+
+  <!-- Accent dots kecil di pojok kanan atas -->
+  <circle cx="39" cy="9" r="1.8" fill="white" opacity="0.45"/>
+  <circle cx="43" cy="13" r="1" fill="white" opacity="0.25"/>
 </svg>

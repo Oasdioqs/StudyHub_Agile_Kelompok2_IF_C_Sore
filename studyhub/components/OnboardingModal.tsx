@@ -76,21 +76,8 @@ export function OnboardingModal({ onComplete }: OnboardingModalProps) {
           animation: 'scaleIn 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
-        {/* Progress bar */}
-        <div style={{ height: 4, background: 'var(--sh-border, #e2e8f0)' }}>
-          <div
-            style={{
-              height: '100%',
-              background: 'linear-gradient(90deg, #4f46e5, #7c3aed)',
-              width: `${((step + 1) / STEPS.length) * 100}%`,
-              transition: 'width 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
-              borderRadius: '0 999px 999px 0',
-            }}
-          />
-        </div>
-
-        <div style={{ padding: '32px 32px 28px' }}>
-          {/* Step indicator */}
+        <div style={{ padding: '28px 32px 28px' }}>
+          {/* Step indicator — single progress dots */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
             {STEPS.map((s, i) => (
               <div

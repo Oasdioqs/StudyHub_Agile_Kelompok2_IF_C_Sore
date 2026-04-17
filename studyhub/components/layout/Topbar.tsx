@@ -59,7 +59,9 @@ export default function Topbar() {
   const [showNotifs, setShowNotifs] = useState(false)
   const [bellBounce, setBellBounce] = useState(false)
   const [deletingAll, setDeletingAll] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
   const prevUnreadRef = useRef(0)
   const notifBusyRef = useRef(false)
   const notifIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -122,6 +124,9 @@ export default function Topbar() {
     const handleClickOutside = (event: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
         setShowNotifs(false)
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setShowProfile(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -501,30 +506,85 @@ export default function Topbar() {
           )}
         </div>
         
-        <div className="dropdown">
-          <button 
-            className="topbar-avatar border-0 p-0 shadow-sm" 
-            title="Profil & Preferensi" 
-            data-bs-toggle="dropdown" 
-            aria-expanded="false"
-            style={{ 
-              width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #10b981 0%, #0ea5e9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white'
+        <div className="position-relative" ref={profileRef}>
+          <button
+            type="button"
+            title="Profil & Preferensi"
+            onClick={() => setShowProfile(p => !p)}
+            style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #10b981, #0ea5e9)',
+              border: 'none', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer', color: 'white',
+              boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+              flexShrink: 0,
             }}
           >
-            <i className="bi bi-person-fill" style={{ fontSize: '18px' }}></i>
+            <i className="bi bi-person-fill" style={{ fontSize: 18 }} />
           </button>
-          <ul className="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-2" style={{ borderRadius: '16px', minWidth: '220px', zIndex: 1050, background: 'var(--sh-card-bg)' }}>
-            <li className="px-3 py-2 mb-1">
-              <div className="fw-bold" style={{ fontSize: '14px', color: 'var(--sh-text)' }}>Akun Saya</div>
-              <div className="text-secondary text-truncate" style={{ fontSize: '12px' }}>Pengguna StudyHub</div>
-            </li>
-            <li><hr className="dropdown-divider mb-1 mt-0" /></li>
-            <li><Link href="/profile" className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px', color: 'var(--sh-text)' }}><i className="bi bi-person-circle me-2 text-primary"></i>Profil Utama</Link></li>
-            <li><button className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px', color: 'var(--sh-text)' }} onClick={toggleTheme}><i className={`bi ${isDark ? 'bi-sun-fill text-warning' : 'bi-moon-stars-fill text-secondary'} me-2`}></i>{isDark ? 'Mode Terang' : 'Mode Gelap'}</button></li>
-            <li><Link href="/profile" className="dropdown-item py-2 fw-semibold rounded-3 mb-1" style={{ fontSize: '13px', color: 'var(--sh-text)' }}><i className="bi bi-gear-fill me-2 text-secondary"></i>Preferensi</Link></li>
-            <li><hr className="dropdown-divider my-1" /></li>
-            <li><Link href="/auth/login" className="dropdown-item py-2 fw-semibold rounded-3 text-danger" style={{ fontSize: '13px' }} onClick={() => fetch('/api/auth/signout', {method:'POST'})}><i className="bi bi-box-arrow-right me-2"></i>Keluar</Link></li>
-          </ul>
+
+          {showProfile && (
+            <div
+              className="animate-scale-in"
+              style={{
+                position: 'absolute', top: 'calc(100% + 10px)', right: 0,
+                width: 224, borderRadius: 16, zIndex: 1050, overflow: 'hidden',
+                background: 'var(--sh-card-bg)',
+                border: '1px solid var(--sh-border)',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+              }}
+            >
+              {/* Header akun */}
+              <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--sh-border)' }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--sh-text)' }}>Akun Saya</div>
+                <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 2 }}>Pengguna StudyHub</div>
+              </div>
+
+              {/* Menu items */}
+              <div style={{ padding: '6px' }}>
+                <Link
+                  href="/profile"
+                  onClick={() => setShowProfile(false)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, textDecoration: 'none', color: 'var(--sh-text)', fontSize: 13, fontWeight: 600 }}
+                  className="row-highlight"
+                >
+                  <i className="bi bi-person-circle" style={{ color: '#6366f1', fontSize: 15 }} />
+                  Profil Saya
+                </Link>
+
+                <button
+                  onClick={() => { toggleTheme(); setShowProfile(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, width: '100%', border: 'none', background: 'none', color: 'var(--sh-text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}
+                  className="row-highlight"
+                >
+                  <i className={`bi ${isDark ? 'bi-sun-fill' : 'bi-moon-stars-fill'}`} style={{ color: isDark ? '#f59e0b' : '#64748b', fontSize: 15 }} />
+                  {isDark ? 'Mode Terang' : 'Mode Gelap'}
+                </button>
+
+                <Link
+                  href="/upgrade"
+                  onClick={() => setShowProfile(false)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, textDecoration: 'none', color: '#7c3aed', fontSize: 13, fontWeight: 600 }}
+                  className="row-highlight"
+                >
+                  <i className="bi bi-star-fill" style={{ fontSize: 15 }} />
+                  Upgrade Premium
+                </Link>
+
+                <div style={{ height: 1, background: 'var(--sh-border)', margin: '6px 0' }} />
+
+                <Link
+                  href="/auth/login"
+                  onClick={() => { fetch('/api/auth/logout', { method: 'POST' }).catch(() => {}); setShowProfile(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, textDecoration: 'none', color: '#ef4444', fontSize: 13, fontWeight: 600 }}
+                  className="row-highlight"
+                >
+                  <i className="bi bi-box-arrow-right" style={{ fontSize: 15 }} />
+                  Keluar
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

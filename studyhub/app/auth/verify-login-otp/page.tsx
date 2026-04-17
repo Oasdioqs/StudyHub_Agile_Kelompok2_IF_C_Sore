@@ -228,6 +228,11 @@ export default function VerifyLoginOtpPage() {
             className="otp-hidden-input"
             value={otp}
             onChange={(e) => setOtp(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
+            onPaste={(e) => {
+              const text = e.clipboardData.getData('text')
+              const digits = text.replace(/[^\d]/g, '').slice(0, 6)
+              if (digits) { e.preventDefault(); setOtp(digits) }
+            }}
             disabled={requestLoading || verifyLoading}
             maxLength={6}
           />

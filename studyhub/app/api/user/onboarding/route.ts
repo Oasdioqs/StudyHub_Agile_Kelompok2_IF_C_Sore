@@ -17,11 +17,19 @@ export async function POST(req: NextRequest) {
   const parsed = OnboardingSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Data tidak valid' }, { status: 400 })
 
+  // Cek apakah ini pertama kali onboarding (biar poin cuma dikasih sekali)
+  const existing = await db.user.findUnique({
+    where: { id: userId },
+    select: { onboardingDone: true },
+  })
+
   await db.user.update({
     where: { id: userId },
     data: {
       ...parsed.data,
       onboardingDone: true,
+      // +10 poin hanya jika belum pernah onboarding sebelumnya
+      ...(existing?.onboardingDone === false && { points: { increment: 10 } }),
     },
   })
 
