@@ -1,6 +1,5 @@
-const AI_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini'
-// Vision model — must support image input
-const VISION_MODEL = 'openai/gpt-4o-mini'
+// Groq models - GPU accelerated, fast & free
+const GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 export async function callAI(
   messages: { role: string; content: string }[],
@@ -11,17 +10,15 @@ export async function callAI(
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'HTTP-Referer': process.env.NEXTAUTH_URL || 'https://studyhub-olive.vercel.app',
-        'X-Title': 'StudyHub PDF AI',
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: AI_MODEL,
+        model: GROQ_MODEL,
         messages,
         max_tokens: maxTokens,
         temperature: 0.5,
@@ -41,8 +38,8 @@ export async function callAI(
 }
 
 /**
- * Kirim gambar (base64 PNG/JPEG) ke vision AI untuk OCR / ekstraksi teks.
- * Cocok untuk halaman PDF yang berisi screenshot kode atau gambar scan.
+ * Vision AI untuk OCR / ekstraksi teks dari gambar PDF.
+ * Tetap pakai OpenRouter karena Groq belum support vision.
  */
 export async function callAIVision(
   base64Image: string,
@@ -65,7 +62,7 @@ export async function callAIVision(
         'X-Title': 'StudyHub PDF Vision',
       },
       body: JSON.stringify({
-        model: VISION_MODEL,
+        model: 'openai/gpt-4o-mini',
         messages: [
           {
             role: 'user',

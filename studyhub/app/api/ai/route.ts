@@ -7,16 +7,12 @@ import { checkRateLimit, RATE_LIMITS, rateLimitResponse } from '@/lib/rate-limit
 
 const FREE_DAILY_LIMIT = 10
 
-// Model dengan fallback otomatis — jika satu down, coba berikutnya
-const FREE_MODELS = [
-  'minimax/minimax-m2.5:free',          // MiniMax M2.5 — dicoba user
-  'qwen/qwq-32b:free',                   // QwQ — reasoning bagus
-  'deepseek/deepseek-chat-v3-0324:free', // DeepSeek Chat V3
-  'meta-llama/llama-3.3-70b-instruct:free', // Llama 3.3 70B
-  'google/gemma-3-27b-it:free',          // Gemma 3
-  'mistralai/mistral-7b-instruct:free',  // Fallback terakhir
+// Groq — GPU free, lebih stabil & cepat
+const GROQ_MODELS = [
+  'llama-3.3-70b-versatile',   // Main model — powerful & fast
+  'mixtral-8x7b-32768',        // Fallback
+  'llama-3.1-8b-instant',      // Fallback 2 — lebih cepat
 ]
-const AI_MODEL = process.env.OPENROUTER_MODEL || FREE_MODELS[0]
 
 type SimpleMessage = { role: 'user' | 'assistant'; content: string }
 type AttachmentPayload = { type: 'image' | 'text' | 'file'; name?: string; content?: string; mimeType?: string }
@@ -554,22 +550,18 @@ ${contextStr}`
       })),
     ].filter((m) => !!m.content)
 
-    // Coba model satu per satu — fallback otomatis jika 404
-    const modelsToTry = process.env.OPENROUTER_MODEL
-      ? [process.env.OPENROUTER_MODEL]
-      : FREE_MODELS
+    // Coba model satu per satu — fallback otomatis jika error
+    const modelsToTry = GROQ_MODELS
 
     let aiData: any = null
     let lastErr = ''
 
     for (const model of modelsToTry) {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          'HTTP-Referer': process.env.NEXTAUTH_URL || 'https://studyhub.vercel.app',
-          'X-Title': 'StudyHub AI Tutor',
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         },
         body: JSON.stringify({ model, messages: aiMessages }),
       })

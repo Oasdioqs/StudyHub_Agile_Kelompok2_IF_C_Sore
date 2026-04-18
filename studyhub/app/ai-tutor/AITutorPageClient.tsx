@@ -9,6 +9,35 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Sidebar from '@/components/layout/Sidebar'
 import TopbarShell from '@/components/layout/TopbarShell'
 
+// Web Speech API types
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string
+}
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number
+  results: SpeechRecognitionAlternativeList
+}
+interface SpeechRecognitionAlternativeList {
+  length: number
+  item(index: number): SpeechRecognitionAlternative
+  [index: number]: SpeechRecognitionAlternative
+}
+interface SpeechRecognitionAlternative {
+  transcript: string
+  confidence: number
+}
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onstart: (() => void) | null
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
+  onend: (() => void) | null
+  start(): void
+  stop(): void
+}
+
 type UploadItem = { type: 'image' | 'text' | 'file'; name: string; content: string; mimeType?: string; preview?: string }
 type Message = { role: 'user' | 'assistant'; content: string; id?: string; attachments?: UploadItem[] }
 type ChatSession = { id: string; title: string; updatedAt: string }
@@ -48,6 +77,308 @@ export default function AITutorPageClient() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // ── Voice Call State ────────────────────────────────────────────────────────
+  const [isVoiceCall, setIsVoiceCall] = useState(false)
+  const [isListening, setIsListening] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const [voiceResponse, setVoiceResponse] = useState('')
+  const [callDuration, setCallDuration] = useState(0)
+  const [showVoiceOverlay, setShowVoiceOverlay] = useState(false)
+  const [voiceError, setVoiceError] = useState('')
+  const [speechDetected, setSpeechDetected] = useState(false)
+  const [useTextMode, setUseTextMode] = useState(false)
+  const [textInput, setTextInput] = useState('')
+  const [conversationHistory, setConversationHistory] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
+  const recognitionRef = useRef<any>(null)
+  const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const callTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const textInputRef = useRef<HTMLInputElement>(null)
+
+  // Voice Call Functions
+  const startVoiceCall = async () => {
+    setIsVoiceCall(true)
+    setShowVoiceOverlay(true)
+    setCallDuration(0)
+    setConversationHistory([])
+    setVoiceTranscript('')
+    setVoiceResponse('')
+    setVoiceError('')
+    setSpeechDetected(false)
+    setUseTextMode(false)
+
+    // Start duration timer
+    callTimerRef.current = setInterval(() => {
+      setCallDuration(prev => prev + 1)
+    }, 1000)
+
+    // Check if browser supports speech recognition
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognitionClass) {
+      setVoiceError('Browser tidak mendukung. Gunakan Chrome atau Edge.')
+      setUseTextMode(true)
+      return
+    }
+
+    // Start listening directly
+    startListening()
+  }
+
+  const endVoiceCall = () => {
+    setIsVoiceCall(false)
+    setShowVoiceOverlay(false)
+    setIsListening(false)
+    setIsSpeaking(false)
+    setVoiceTranscript('')
+    setVoiceResponse('')
+    setVoiceError('')
+    setSpeechDetected(false)
+    setUseTextMode(false)
+    setTextInput('')
+
+    if (callTimerRef.current) {
+      clearInterval(callTimerRef.current)
+      callTimerRef.current = null
+    }
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop() } catch {}
+    }
+    window.speechSynthesis.cancel()
+  }
+
+  const startListening = () => {
+    if (typeof window === 'undefined') return
+
+    setVoiceError('')
+    setSpeechDetected(false)
+    setIsListening(true)
+
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+
+    if (!SpeechRecognitionClass) {
+      setVoiceError(`Browser tidak mendukung.${isIOS ? ' iPhone belum support.' : ' Gunakan Chrome/Edge.'}`)
+      setIsListening(false)
+      setUseTextMode(true)
+      return
+    }
+
+    let recognition: any
+    try {
+      recognition = new SpeechRecognitionClass()
+    } catch (err) {
+      console.error('Failed to create recognition:', err)
+      setVoiceError('Gagal inisialisasi Speech Recognition')
+      setIsListening(false)
+      setUseTextMode(true)
+      return
+    }
+
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = 'id-ID'
+
+    recognition.onstart = () => {
+      setIsListening(true)
+      setVoiceTranscript('')
+      setVoiceError('')
+      // On iOS, show message about needing to tap screen to enable mic
+      if (isIOS) {
+        setVoiceError('🎤 Tap anywhere on screen to enable microphone')
+        setTimeout(() => {
+          if (!speechDetected) {
+            setVoiceError('')
+          }
+        }, 3000)
+      }
+    }
+
+    recognition.onresult = async (event: any) => {
+      let transcript = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript
+      }
+      setVoiceTranscript(transcript)
+      setSpeechDetected(transcript.length > 3)
+
+      if (event.results[event.results.length - 1].isFinal) {
+        const finalTranscript = transcript.trim()
+        if (finalTranscript.length > 2) {
+          setIsListening(false)
+          setSpeechDetected(true)
+          await processVoiceInput(finalTranscript)
+        } else {
+          startListening()
+        }
+      }
+    }
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech error:', event.error)
+      setIsListening(false)
+      if (event.error === 'no-speech') {
+        // Normal - no speech detected, restart listening
+        startListening()
+      } else if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+        if (isIOS) {
+          setVoiceError('🔒 Allow microphone di Safari settings: Settings → Safari → Microphone → Allow')
+        } else {
+          setVoiceError('🔒 Microphone diblokir. Cek settings: chrome://settings/content/microphone')
+        }
+        setUseTextMode(true)
+      } else if (event.error === 'audio-capture') {
+        setVoiceError('❌ Microphone tidak terdeteksi. Pastikan device terinstall.')
+        setUseTextMode(true)
+      } else if (event.error === 'network') {
+        setVoiceError('🌐 Error jaringan. Coba lagi.')
+        startListening()
+      } else {
+        console.error('Unknown speech error:', event.error)
+        // For other errors, try to restart listening
+        setTimeout(() => {
+          if (isVoiceCall && !isSpeaking && !useTextMode) {
+            startListening()
+          }
+        }, 1000)
+      }
+    }
+
+    recognition.onend = () => {
+      if (isVoiceCall && !isSpeaking && !useTextMode) {
+        setTimeout(startListening, 300)
+      }
+    }
+
+    recognitionRef.current = recognition
+    try {
+      recognition.start()
+    } catch (err) {
+      console.error('Failed to start recognition:', err)
+      setVoiceError('Gagal mulai speech recognition')
+      setIsListening(false)
+      setUseTextMode(true)
+    }
+  }
+
+  const sendTextVoiceInput = async () => {
+    if (!textInput.trim()) return
+    const text = textInput.trim()
+    setTextInput('')
+    await processVoiceInput(text)
+  }
+
+  const processVoiceInput = async (text: string) => {
+    if (!text.trim()) {
+      startListening()
+      return
+    }
+
+    // Add to conversation history
+    const newHistory = [...conversationHistory, { role: 'user' as const, content: text }]
+    setConversationHistory(newHistory)
+    setVoiceResponse('Memproses...')
+    setSpeechDetected(true)
+
+    try {
+      const { data } = await axios.post('/api/ai', {
+        message: text,
+        sessionId: sessionId || undefined,
+        mode: aiMode,
+        historyOverride: newHistory.slice(-10),
+      })
+
+      const reply = data.reply || 'Maaf, saya tidak bisa menjawab saat ini.'
+
+      // Clean reply - remove action blocks and markdown
+      const cleanReply = reply
+        .replace(/\[STUDYHUB_ACTION:\{[\s\S]*?\}\]/g, '')
+        .replace(/```[\s\S]*?```/g, '[kode]')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .trim()
+
+      // Update conversation
+      setConversationHistory(prev => [...prev, { role: 'assistant' as const, content: cleanReply }])
+      setVoiceResponse(cleanReply)
+
+      // Speak the response
+      await speakText(cleanReply)
+
+    } catch (err) {
+      console.error('Voice processing error:', err)
+      setVoiceResponse('Maaf, terjadi kesalahan. Coba lagi.')
+      await speakText('Maaf, terjadi kesalahan. Coba lagi.')
+    }
+
+    // Continue listening
+    startListening()
+  }
+
+  const speakText = (text: string) => {
+    return new Promise<void>((resolve) => {
+      // iOS Safari requires user interaction first to enable audio
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+
+      if (isIOS) {
+        // Try to unlock audio context on iOS
+        const unlockAudio = () => {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+          if (ctx.state === 'suspended') {
+            ctx.resume()
+          }
+        }
+        unlockAudio()
+      }
+
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel()
+
+      // Small delay for iOS to process
+      const speakNow = () => {
+        const utterance = new SpeechSynthesisUtterance(text)
+        utterance.lang = 'id-ID'
+        utterance.rate = isIOS ? 1.0 : 1.1 // iOS slower
+        utterance.pitch = 1
+
+        utterance.onstart = () => setIsSpeaking(true)
+        utterance.onend = () => {
+          setIsSpeaking(false)
+          resolve()
+        }
+        utterance.onerror = (e: any) => {
+          console.error('Speech error:', e)
+          setIsSpeaking(false)
+          resolve()
+        }
+
+        // Try to get voices (async on iOS)
+        const voices = window.speechSynthesis.getVoices()
+        if (voices.length > 0) {
+          // Prefer Indonesian voice
+          const idVoice = voices.find((v: SpeechSynthesisVoice) => v.lang.startsWith('id'))
+          if (idVoice) utterance.voice = idVoice
+        }
+
+        speechSynthRef.current = utterance
+        window.speechSynthesis.speak(utterance)
+      }
+
+      if (isIOS) {
+        setTimeout(speakNow, 100)
+      } else {
+        speakNow()
+      }
+    })
+  }
+
+  // Format duration
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false)
@@ -192,7 +523,8 @@ export default function AITutorPageClient() {
 
   // ── Action System: parse & execute [STUDYHUB_ACTION:{...}] dari AI ──────────
   const executeActions = async (reply: string): Promise<string> => {
-    const actionRegex = /\[STUDYHUB_ACTION:(\{[^[\]]+\})\]/g
+    // Match [STUDYHUB_ACTION:{...}] with proper bracket balancing
+    const actionRegex = /\[STUDYHUB_ACTION:(\{[\s\S]*?\})\]/g
     const actions: Array<{ type: string; data: Record<string, any> }> = []
     let match: RegExpExecArray | null
 
@@ -204,7 +536,7 @@ export default function AITutorPageClient() {
     }
 
     // Strip action blocks from display text
-    const cleanReply = reply.replace(/\[STUDYHUB_ACTION:\{[^[\]]+\}\]/g, '').trim()
+    const cleanReply = reply.replace(/\[STUDYHUB_ACTION:\{[\s\S]*?\}\]/g, '').trim()
 
     if (actions.length === 0) return cleanReply
 
@@ -218,22 +550,22 @@ export default function AITutorPageClient() {
         switch (action.type) {
           case 'create_task':
             res = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action.data) })
-            msg = res.ok ? `✅ Tugas **"${action.data.title}"** berhasil dibuat!` : `❌ Gagal buat tugas: ${(await res.json()).error}`
+            msg = res.ok ? `✅ Tugas **"${action.data.title}"** berhasil dibuat!` : `❌ Gagal buat tugas. Coba lagi ya!`
             break
 
           case 'edit_task':
             res = await fetch(`/api/tasks/${action.data.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action.data) })
-            msg = res.ok ? `✅ Tugas **"${action.data.title || action.data.id}"** berhasil diupdate!` : `❌ Gagal update tugas`
+            msg = res.ok ? `✅ Tugas **"${action.data.title || action.data.id}"** berhasil diupdate!` : `❌ Gagal update tugas. Coba lagi ya!`
             break
 
           case 'delete_task':
             res = await fetch(`/api/tasks/${action.data.id}`, { method: 'DELETE' })
-            msg = res.ok ? `🗑️ Tugas **"${action.data.title}"** berhasil dihapus.` : `❌ Gagal hapus tugas`
+            msg = res.ok ? `🗑️ Tugas **"${action.data.title}"** berhasil dihapus.` : `❌ Gagal hapus tugas. Coba lagi ya!`
             break
 
           case 'create_note':
             res = await fetch('/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(action.data) })
-            msg = res.ok ? `✅ Catatan **"${action.data.title}"** berhasil dibuat!` : `❌ Gagal buat catatan`
+            msg = res.ok ? `✅ Catatan **"${action.data.title}"** berhasil dibuat!` : `❌ Gagal buat catatan. Coba lagi ya!`
             break
 
           case 'create_schedule': {
@@ -243,7 +575,7 @@ export default function AITutorPageClient() {
             const currentSlots = currData.slots || []
             const newSlots = [...currentSlots, action.data]
             res = await fetch('/api/schedule', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slots: newSlots }) })
-            msg = res.ok ? `✅ Jadwal **"${action.data.title}"** berhasil ditambahkan!` : `❌ Gagal tambah jadwal`
+            msg = res.ok ? `✅ Jadwal **"${action.data.title}"** berhasil ditambahkan!` : `❌ Gagal tambah jadwal. Coba lagi ya!`
             break
           }
 
@@ -253,7 +585,7 @@ export default function AITutorPageClient() {
             const currData2 = currRes2.ok ? await currRes2.json() : { slots: [] }
             const filteredSlots = (currData2.slots || []).filter((s: any) => s.id !== action.data.id)
             res = await fetch('/api/schedule', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slots: filteredSlots }) })
-            msg = res.ok ? `🗑️ Jadwal berhasil dihapus.` : `❌ Gagal hapus jadwal`
+            msg = res.ok ? `🗑️ Jadwal berhasil dihapus.` : `❌ Gagal hapus jadwal. Coba lagi ya!`
             break
           }
 
@@ -1363,9 +1695,30 @@ export default function AITutorPageClient() {
                 <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--sh-text)', letterSpacing: '-0.01em', lineHeight: 1.2 }}>StudyHub AI</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 1 }}>
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80' }} />
-                  <span style={{ fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600 }}>Online · DeepSeek R1</span>
+                  <span style={{ fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600 }}>Online · StudyBot 0.3</span>
                 </div>
               </div>
+              {/* Voice Call Button */}
+              <button
+                onClick={startVoiceCall}
+                className="btn btn-sm"
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 20,
+                  padding: '6px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                }}
+              >
+                <i className="bi bi-telephone-fill"></i>
+                Call
+              </button>
             </div>
             <div className="d-flex align-items-center gap-2">
               <div className="ai-mode-wrap">
@@ -3232,6 +3585,373 @@ export default function AITutorPageClient() {
           >
             <i className="bi bi-x-lg"></i>
           </button>
+        </div>
+      )}
+
+      {/* ── JARVIS Voice Call Overlay ───────────────────────────────────────── */}
+      {showVoiceOverlay && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0f0f2a 100%)',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff'
+          }}
+        >
+          {/* Animated Background Circles - JARVIS style */}
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+            {/* Outer ring */}
+            <div style={{
+              width: 300,
+              height: 300,
+              borderRadius: '50%',
+              border: '2px solid rgba(99, 102, 241, 0.3)',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              animation: 'jarvisRing 3s ease-in-out infinite',
+            }} />
+            {/* Middle ring */}
+            <div style={{
+              width: 250,
+              height: 250,
+              borderRadius: '50%',
+              border: '2px solid rgba(139, 92, 246, 0.5)',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              animation: 'jarvisRing 2s ease-in-out infinite reverse',
+            }} />
+            {/* Inner ring */}
+            <div style={{
+              width: 200,
+              height: 200,
+              borderRadius: '50%',
+              border: '2px solid rgba(168, 85, 247, 0.7)',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              animation: 'jarvisRing 1.5s ease-in-out infinite',
+            }} />
+
+            {/* Pulsing center orb */}
+            <div style={{
+              width: 120,
+              height: 120,
+              borderRadius: '50%',
+              background: isSpeaking
+                ? 'radial-gradient(circle, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)'
+                : isListening
+                  ? 'radial-gradient(circle, #10b981 0%, #059669 100%)'
+                  : 'radial-gradient(circle, #4f46e5 0%, #7c3aed 100%)',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              boxShadow: isSpeaking
+                ? '0 0 60px rgba(99, 102, 241, 0.8), 0 0 120px rgba(139, 92, 246, 0.5)'
+                : isListening
+                  ? '0 0 60px rgba(16, 185, 129, 0.8), 0 0 120px rgba(5, 150, 105, 0.5)'
+                  : '0 0 40px rgba(79, 70, 229, 0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              animation: isSpeaking ? 'jarvisPulse 0.5s ease-in-out infinite' : isListening ? 'jarvisPulse 1s ease-in-out infinite' : 'jarvisIdle 2s ease-in-out infinite',
+            }}>
+              <i className={`bi ${isSpeaking ? 'bi-volume-up-fill' : isListening ? 'bi-mic-fill' : 'bi-robot'}`}
+                style={{ fontSize: 48, color: '#fff' }}
+              />
+            </div>
+
+            {/* Waveform bars - show when speaking */}
+            {isSpeaking && (
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                display: 'flex',
+                gap: 4,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: 3,
+                      height: 20 + Math.random() * 30,
+                      background: '#fff',
+                      borderRadius: 2,
+                      animation: `jarvisWave ${0.2 + Math.random() * 0.3}s ease-in-out infinite`,
+                      animationDelay: `${i * 0.05}s`,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Status text */}
+          <div style={{
+            position: 'absolute',
+            top: '15%',
+            textAlign: 'center',
+          }}>
+            {/* Error message */}
+            {voiceError && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.2)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: 12,
+                padding: '12px 20px',
+                marginBottom: 16,
+                maxWidth: 400,
+                margin: '0 auto 16px',
+              }}>
+                <div style={{ fontSize: 13, color: '#fca5a5' }}>
+                  ⚠️ {voiceError}
+                </div>
+                <button
+                  onClick={startListening}
+                  style={{
+                    marginTop: 8,
+                    background: 'rgba(239, 68, 68, 0.3)',
+                    border: '1px solid rgba(239, 68, 68, 0.5)',
+                    borderRadius: 8,
+                    padding: '6px 16px',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                  }}
+                >
+                  🔄 Coba Lagi
+                </button>
+              </div>
+            )}
+
+            {/* Speech detection indicator */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              marginBottom: 12,
+            }}>
+              <div style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: isSpeaking ? '#10b981' : isListening ? '#f59e0b' : '#6366f1',
+                boxShadow: `0 0 10px ${isSpeaking ? '#10b981' : isListening ? '#f59e0b' : '#6366f1'}`,
+                animation: isListening ? 'jarvisPulse 1s ease-in-out infinite' : 'none',
+              }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
+                {isSpeaking ? 'AI sedang berbicara...' :
+                 isListening ? (speechDetected ? 'Mendengar... 🔊' : 'Mendengarkan... 🎤') :
+                 voiceResponse === 'Memproses...' ? 'Memproses... ⏳' :
+                 'Tekan untuk bicara'}
+              </span>
+            </div>
+
+            <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.02em' }}>
+              StudyBot 0.3
+            </div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 8 }}>
+              {formatDuration(callDuration)}
+            </div>
+
+            {/* Manual trigger button if not listening */}
+            {!isListening && !isSpeaking && voiceResponse !== 'Memproses...' && (
+              <button
+                onClick={startListening}
+                style={{
+                  marginTop: 16,
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  border: 'none',
+                  borderRadius: 30,
+                  padding: '14px 32px',
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 20px rgba(16, 185, 129, 0.4)',
+                }}
+              >
+                🎤 Mulai Bicara
+              </button>
+            )}
+          </div>
+
+          {/* Transcript area */}
+          <div style={{
+            position: 'absolute',
+            bottom: '18%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '85%',
+            maxWidth: 600,
+            textAlign: 'center',
+          }}>
+            {/* Text Input Fallback */}
+            {useTextMode && voiceResponse !== 'Memproses...' && !isSpeaking && (
+              <div style={{
+                background: 'rgba(30, 30, 60, 0.8)',
+                border: '1px solid rgba(99, 102, 241, 0.4)',
+                borderRadius: 20,
+                padding: '16px',
+                marginBottom: 16,
+              }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>
+                  💬 Mode Teks - ketik dan kirim
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <input
+                    ref={textInputRef}
+                    type="text"
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') sendTextVoiceInput()
+                    }}
+                    placeholder="Ketik pertanyaanmu..."
+                    style={{
+                      flex: 1,
+                      padding: '12px 16px',
+                      borderRadius: 12,
+                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                      background: 'rgba(20, 20, 50, 0.8)',
+                      color: '#fff',
+                      fontSize: 14,
+                      outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={sendTextVoiceInput}
+                    disabled={!textInput.trim() || isSpeaking}
+                    style={{
+                      padding: '12px 20px',
+                      borderRadius: 12,
+                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      border: 'none',
+                      color: '#fff',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <i className="bi bi-send-fill"></i>
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    setUseTextMode(false)
+                    setVoiceError('')
+                    startListening()
+                  }}
+                  style={{
+                    marginTop: 10,
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: 10,
+                    background: 'rgba(16, 185, 129, 0.2)',
+                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                    color: '#10b981',
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  🎤 Coba Pakai Microphone Lagi
+                </button>
+              </div>
+            )}
+
+            {/* User speech */}
+            {voiceTranscript && (
+              <div style={{
+                background: 'rgba(99, 102, 241, 0.2)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: 16,
+                padding: '16px 24px',
+                marginBottom: 16,
+              }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Kamu:</div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{voiceTranscript}</div>
+              </div>
+            )}
+            {/* AI response */}
+            {voiceResponse && voiceResponse !== 'Memproses...' && (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.2)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: 16,
+                padding: '16px 24px',
+              }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>AI:</div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{voiceResponse}</div>
+              </div>
+            )}
+            {/* Processing indicator */}
+            {voiceResponse === 'Memproses...' && (
+              <div style={{ color: 'rgba(255,255,255,0.6)' }}>
+                <span className="spinner-border spinner-border-sm" style={{ marginRight: 8 }} />
+                Memproses...
+              </div>
+            )}
+          </div>
+
+          {/* End call button */}
+          <button
+            onClick={endVoiceCall}
+            style={{
+              position: 'absolute',
+              bottom: '8%',
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: '#ef4444',
+              border: 'none',
+              color: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(239, 68, 68, 0.4)',
+              cursor: 'pointer',
+            }}
+          >
+            <i className="bi bi-telephone-x-fill" style={{ fontSize: 24 }} />
+          </button>
+
+          {/* CSS Animations */}
+          <style>{`
+            @keyframes jarvisRing {
+              0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
+              50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.6; }
+            }
+            @keyframes jarvisPulse {
+              0%, 100% { transform: translate(-50%, -50%) scale(1); }
+              50% { transform: translate(-50%, -50%) scale(1.08); }
+            }
+            @keyframes jarvisIdle {
+              0%, 100% { transform: translate(-50%, -50%) scale(1); }
+              50% { transform: translate(-50%, -50%) scale(1.02); }
+            }
+            @keyframes jarvisWave {
+              0%, 100% { height: 20px; }
+              50% { height: 50px; }
+            }
+          `}</style>
         </div>
       )}
     </div>

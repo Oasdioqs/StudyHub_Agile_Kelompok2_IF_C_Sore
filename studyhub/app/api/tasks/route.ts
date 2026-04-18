@@ -4,10 +4,16 @@ import { getUserIdFromRequest } from '@/lib/api-session'
 import { db } from '@/lib/db'
 import { createNotificationWithPush } from '@/lib/notification-push'
 
+// Accept any date format: "2026-04-20", "2026-04-20T12:00", "2026-04-20T12:00:00", "2026-04-20T12:00:00+07:00"
+const dateString = z.string().refine((val) => {
+  const d = new Date(val)
+  return !isNaN(d.getTime())
+}, { message: 'Format tanggal tidak valid' }).transform((val) => new Date(val))
+
 const CreateTaskSchema = z.object({
   title: z.string().min(1, 'Judul wajib diisi').max(255),
   description: z.string().max(2000).optional(),
-  deadline: z.string().datetime({ offset: true }).optional().nullable(),
+  deadline: dateString.optional().nullable(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional().default('MEDIUM'),
   subject: z.string().max(100).optional(),
 })

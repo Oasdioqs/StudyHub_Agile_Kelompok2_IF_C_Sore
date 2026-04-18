@@ -137,6 +137,36 @@ body {
   }
 }
 
+@keyframes progressShimmer {
+  0% {
+    width: 0%;
+    opacity: 0.7;
+  }
+  50% {
+    width: 100%;
+    opacity: 1;
+  }
+  100% {
+    width: 0%;
+    opacity: 0.7;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fv-content-section {
+  animation: fadeInUp 400ms ease-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-transition {
     animation: none;

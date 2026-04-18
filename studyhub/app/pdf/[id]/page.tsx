@@ -135,12 +135,12 @@ export default function PdfDetailPage() {
   const [doc, setDoc] = useState<PdfDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'summary' | 'challenges' | 'ask'>('summary')
+  const [summaryView, setSummaryView] = useState<'short' | 'full'>('short')
 
   const [genLoading, setGenLoading] = useState(false)
   const [genError, setGenError] = useState('')
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [summaryError, setSummaryError] = useState('')
-  const [summaryView, setSummaryView] = useState<'short' | 'full'>('short')
   const [fullLoading, setFullLoading] = useState(false)
   const [fullError, setFullError] = useState('')
 
@@ -329,56 +329,161 @@ export default function PdfDetailPage() {
               {summaryView === 'full' && doc.status === 'READY' ? (
                 <div>
                   {doc.summaryFull ? (
-                    <div className="card" style={{ borderRadius: 14 }}>
-                      <div className="card-body" style={{ padding: '20px 24px' }}>
-                        <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
-                          <span style={{ fontSize: 20 }}>📖</span>
-                          <span className="fw-bold" style={{ fontSize: 14 }}>Full Version</span>
-                          <span className="text-muted small">
-                            Penjelasan per {fk === 'pptx' ? 'slide' : fk === 'docx' ? 'bagian' : 'halaman'} dari isi dokumen
-                          </span>
-                          <button
-                            type="button"
-                            className="btn btn-outline-secondary btn-sm ms-auto"
-                            onClick={generateFullVersion}
-                            disabled={fullLoading}
-                          >
-                            {fullLoading ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-arrow-clockwise me-1" />Buat ulang</>}
-                          </button>
+                    <div style={{
+                      background: 'var(--sh-card-bg)',
+                      border: '1px solid var(--sh-border)',
+                      borderRadius: 16,
+                      overflow: 'hidden'
+                    }}>
+                      {/* Header */}
+                      <div style={{
+                        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)',
+                        padding: '20px 24px',
+                        color: '#fff'
+                      }}>
+                        <div className="d-flex align-items-center gap-2 mb-1">
+                          <span style={{ fontSize: 24 }}>📖</span>
+                          <span className="fw-bold" style={{ fontSize: 18 }}>Full Version</span>
                         </div>
+                        <p style={{ fontSize: 13, opacity: 0.9, margin: 0 }}>
+                          Penjelasan lengkap per {fk === 'pptx' ? 'slide' : fk === 'docx' ? 'bagian' : 'halaman'}
+                        </p>
+                      </div>
+
+                      {/* Content */}
+                      <div style={{ padding: '24px' }}>
                         {fullError && (
                           <div className="alert alert-danger py-2 mb-3" style={{ fontSize: 13, borderRadius: 10 }}>{fullError}</div>
                         )}
                         <div
                           className="pdf-summary-content"
-                          style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--sh-text)' }}
+                          style={{ fontSize: 14, lineHeight: 1.85, color: 'var(--sh-text)' }}
                           dangerouslySetInnerHTML={{ __html: summaryMarkdownToSafeHtml(doc.summaryFull) }}
                         />
                       </div>
-                    </div>
-                  ) : (
-                    <div className="card" style={{ borderRadius: 14 }}>
-                      <div className="card-body text-center py-5" style={{ padding: '24px' }}>
-                        <div style={{ fontSize: 48, marginBottom: 12 }}>📖</div>
-                        <p className="fw-semibold mb-1">Full Version</p>
-                        <p className="text-muted small mb-3 mx-auto" style={{ maxWidth: 420 }}>
-                          AI akan menjelaskan isi dokumen secara berurutan — setiap {fk === 'pptx' ? 'slide' : fk === 'docx' ? 'bagian utama' : 'halaman'} — lebih panjang dari ringkasan singkat. Butuh sedikit waktu.
-                        </p>
-                        {fullError && (
-                          <div className="alert alert-danger py-2 mb-3 mx-auto" style={{ fontSize: 13, borderRadius: 10, maxWidth: 420 }}>{fullError}</div>
-                        )}
+
+                      {/* Footer */}
+                      <div style={{
+                        padding: '16px 24px',
+                        borderTop: '1px solid var(--sh-border)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <span className="text-muted small">
+                          <i className="bi bi-arrow-repeat me-1" />
+                          Regenerate untuk hasil berbeda
+                        </span>
                         <button
                           type="button"
-                          className="btn btn-primary"
+                          className="btn btn-sm"
                           onClick={generateFullVersion}
                           disabled={fullLoading}
+                          style={{
+                            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 8,
+                            fontSize: 12
+                          }}
                         >
                           {fullLoading ? (
-                            <><span className="spinner-border spinner-border-sm me-2" />Membuat versi lengkap…</>
+                            <span className="spinner-border spinner-border-sm" />
                           ) : (
-                            <><i className="bi bi-stars me-2" />Buat Full Version</>
+                            <><i className="bi bi-arrow-clockwise me-1" />Buat Ulang</>
                           )}
                         </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      background: 'var(--sh-card-bg)',
+                      border: '1px solid var(--sh-border)',
+                      borderRadius: 20,
+                      overflow: 'hidden'
+                    }}>
+                      {/* Hero Section */}
+                      <div style={{
+                        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)',
+                        padding: '48px 32px',
+                        textAlign: 'center',
+                        color: '#fff'
+                      }}>
+                        <div style={{
+                          width: 80,
+                          height: 80,
+                          borderRadius: '50%',
+                          background: 'rgba(255,255,255,0.2)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '0 auto 20px',
+                          fontSize: 36
+                        }}>
+                          📖
+                        </div>
+                        <h4 className="fw-bold mb-2" style={{ fontSize: 22 }}>Full Version</h4>
+                        <p style={{ fontSize: 14, opacity: 0.9, maxWidth: 400, margin: '0 auto' }}>
+                          Penjelasan mendalam per {fk === 'pptx' ? 'slide' : fk === 'docx' ? 'bagian' : 'halaman'}
+                        </p>
+                      </div>
+
+                      {/* Features */}
+                      <div style={{ padding: '32px' }}>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(3, 1fr)',
+                          gap: 16,
+                          marginBottom: 32
+                        }}>
+                          {[
+                            { icon: '📑', title: 'Per Halaman', desc: 'Penjelasan tiap halaman lengkap' },
+                            { icon: '💡', title: 'Deep Dive', desc: 'Konsep dijelaskan detail' },
+                            { icon: '📝', title: 'Catatan Kunci', desc: 'Poin penting dihighlight' },
+                          ].map((f, i) => (
+                            <div key={i} style={{
+                              background: 'var(--sh-hover)',
+                              borderRadius: 12,
+                              padding: '16px',
+                              textAlign: 'center'
+                            }}>
+                              <div style={{ fontSize: 28, marginBottom: 8 }}>{f.icon}</div>
+                              <p className="fw-bold mb-1" style={{ fontSize: 13 }}>{f.title}</p>
+                              <p className="text-muted mb-0" style={{ fontSize: 11 }}>{f.desc}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {fullError && (
+                          <div className="alert alert-danger mb-3 mx-auto" style={{ fontSize: 13, borderRadius: 10, maxWidth: 500 }}>{fullError}</div>
+                        )}
+
+                        <div className="text-center">
+                          <button
+                            type="button"
+                            className="btn btn-lg"
+                            onClick={generateFullVersion}
+                            disabled={fullLoading}
+                            style={{
+                              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 12,
+                              padding: '14px 36px',
+                              fontSize: 15,
+                              boxShadow: '0 8px 24px rgba(99, 102, 241, 0.35)'
+                            }}
+                          >
+                            {fullLoading ? (
+                              <><span className="spinner-border spinner-border-sm me-2" />Membuat versi lengkap…</>
+                            ) : (
+                              <><i className="bi bi-stars me-2" />Buat Full Version Sekarang</>
+                            )}
+                          </button>
+                          <p className="text-muted small mt-3">
+                            Butuh waktu 30-60 detik · {doc.pageCount > 0 ? `${doc.pageCount} ${fk === 'pptx' ? 'slide' : 'halaman'}` : 'otomatis dideteksi'}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}

@@ -14,13 +14,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   })
   if (!existingTask) return NextResponse.json({ error: 'Tidak ditemukan' }, { status: 404 })
 
+  // Validate deadline format if provided
+  if (body.deadline !== undefined && body.deadline !== null) {
+    const parsed = new Date(body.deadline)
+    if (isNaN(parsed.getTime())) {
+      return NextResponse.json({ error: 'Format tanggal tidak valid' }, { status: 400 })
+    }
+    body.deadline = parsed
+  }
+
   const wasNotDone = existingTask.status !== 'DONE'
   const nowDone = body.status === 'DONE'
 
   let updated: any
   if (wasNotDone && nowDone) {
     const nextDeadline = body.deadline !== undefined
-      ? (body.deadline ? new Date(body.deadline) : null)
+      ? body.deadline
       : existingTask.deadline
     const completedLate = !!nextDeadline && Date.now() > nextDeadline.getTime()
     const notifTitle = completedLate ? 'Tugas selesai, tapi telat' : 'Tugas selesai tepat waktu'
@@ -58,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data: {
         ...(body.title !== undefined && { title: body.title }),
         ...(body.description !== undefined && { description: body.description }),
-        ...(body.deadline !== undefined && { deadline: body.deadline ? new Date(body.deadline) : null }),
+        ...(body.deadline !== undefined && { deadline: body.deadline }),
         ...(body.priority !== undefined && { priority: body.priority }),
         ...(body.status !== undefined && { status: body.status }),
         ...(body.subject !== undefined && { subject: body.subject }),

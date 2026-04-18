@@ -435,9 +435,15 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      return await runProcessingWithTimeout(doc, buffer, fileKind, baseTitle)
+      const result = await runProcessingWithTimeout(doc, buffer, fileKind, baseTitle)
+      // Save blob URL for preview - DON'T delete
+      await db.pdfDocument.update({
+        where: { id: doc.id },
+        data: { summaryFigures: fromBlobUrl as any }, // Reuse field to store URL
+      }).catch(() => {})
+      return result
     } finally {
-      await del(fromBlobUrl).catch(() => {})
+      // Keep blob for preview - only delete after 24h or manual delete
     }
   }
 
