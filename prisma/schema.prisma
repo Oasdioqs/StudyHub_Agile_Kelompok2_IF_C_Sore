@@ -1,0 +1,513 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id               String         @id @default(cuid())
+  name             String
+  email            String         @unique
+  password         String?
+  image            String?
+  bio              String?
+  institution      String?
+  major            String?
+  points           Int            @default(0)
+  streak           Int            @default(0)
+  lastActiveAt     DateTime?
+  emailVerified    DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  isPremium        Boolean        @default(false)
+  onboardingDone   Boolean        @default(false)
+  referralCode     String?        @unique
+  referredBy       String?
+  referralCount    Int            @default(0)
+  pdfUploadCount   Int            @default(0)
+  videoUploadCount Int            @default(0)
+  accounts         Account[]
+  aiSessions       AISession[]
+  flashcardSets    FlashcardSet[]
+  groupMembers     GroupMember[]
+  notes            Note[]
+  notifications    Notification[]
+  pdfDocuments     PdfDocument[]
+  videoSummaries   VideoSummary[]
+  replies          Reply[]
+  sessions         Session[]
+  tasks            Task[]
+  threads          Thread[]
+  timerSessions    TimerSession[]
+  loginOtps        LoginOtp[]
+  dashboardDays    DashboardDay[]
+  weeklyScheduleSlots   WeeklyScheduleSlot[]
+  attendanceRecords     AttendanceRecord[]
+  notificationSetting   UserNotificationSetting?
+  pushTokens            FcmToken[]
+
+  @@map("users")
+}
+
+model WeeklyScheduleSlot {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayOfWeek  Int
+  title      String
+  startTime  String?
+  endTime    String?
+  place      String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, dayOfWeek])
+  @@map("weekly_schedule_slots")
+}
+
+model DashboardDay {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date         DateTime
+  totalTasks   Int      @default(0)
+  doneTasks    Int      @default(0)
+  pendingTasks Int      @default(0)
+  overdueTasks Int      @default(0)
+  progress     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("dashboard_days")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model LoginOtp {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash   String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  lastSentAt DateTime @default(now())
+  provider   String
+
+  @@map("login_otps")
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  deadline    DateTime?
+  priority    Priority   @default(MEDIUM)
+  status      TaskStatus @default(TODO)
+  subject     String?
+  userId      String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  tags      String[]
+  isShared  Boolean  @default(false)
+  userId    String
+  groupId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  group     Group?   @relation(fields: [groupId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notes")
+}
+
+model Group {
+  id                    String                    @id @default(cuid())
+  name                  String
+  description           String?
+  inviteCode            String                    @unique @default(cuid())
+  subject               String?
+  maxMembers            Int                       @default(30)
+  createdAt             DateTime                  @default(now())
+  members               GroupMember[]
+  notes                 Note[]
+  classTasks            ClassTask[]
+  classScheduleSlots    ClassScheduleSlot[]
+  announcements         ClassAnnouncement[]
+  notificationSetting   ClassNotificationSetting?
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id       String    @id @default(cuid())
+  userId   String
+  groupId  String
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@map("group_members")
+}
+
+model ClassTask {
+  id          String     @id @default(cuid())
+  groupId     String
+  group       Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  deadline    DateTime?
+  priority    Priority   @default(MEDIUM)
+  subject     String?
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([groupId])
+  @@map("class_tasks")
+}
+
+model ClassAnnouncement {
+  id          String   @id @default(cuid())
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title       String
+  message     String
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@index([groupId, createdAt])
+  @@map("class_announcements")
+}
+
+model ClassNotificationSetting {
+  id                String   @id @default(cuid())
+  groupId           String   @unique
+  group             Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  taskReminders     Int[]    @default([120, 60])
+  scheduleReminders Int[]    @default([120, 60])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("class_notification_settings")
+}
+
+model UserNotificationSetting {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskReminders     Int[]    @default([120, 60])
+  scheduleReminders Int[]    @default([120, 60])
+  updatedAt         DateTime @updatedAt
+
+  @@map("user_notification_settings")
+}
+
+model FcmToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String   @default("web")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("fcm_tokens")
+}
+
+model ClassScheduleSlot {
+  id          String   @id @default(cuid())
+  groupId     String
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int
+  title       String
+  startTime   String?
+  endTime     String?
+  place       String?
+  sortOrder   Int      @default(0)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([groupId, dayOfWeek])
+  @@map("class_schedule_slots")
+}
+
+model AttendanceRecord {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slotId    String
+  slotType  String
+  date      DateTime
+  status    AttendanceStatus
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([userId, slotId, slotType, date])
+  @@index([userId, date])
+  @@map("attendance_records")
+}
+
+model ClassSessionMode {
+  id        String      @id @default(cuid())
+  slotId    String
+  slotType  String
+  date      DateTime
+  mode      SessionMode @default(MAYA)
+  note      String?
+  setById   String
+  groupId   String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([slotId, slotType, date])
+  @@index([slotId, date])
+  @@map("class_session_modes")
+}
+
+model Thread {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  subject   String?
+  tags      String[]
+  upvotes   Int      @default(0)
+  views     Int      @default(0)
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  replies   Reply[]
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("threads")
+}
+
+model Reply {
+  id           String   @id @default(cuid())
+  content      String
+  upvotes      Int      @default(0)
+  isBestAnswer Boolean  @default(false)
+  userId       String
+  threadId     String
+  parentId     String?
+  createdAt    DateTime @default(now())
+  thread       Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("replies")
+}
+
+model FlashcardSet {
+  id         String      @id @default(cuid())
+  title      String
+  subject    String?
+  isPublic   Boolean     @default(false)
+  userId     String
+  createdAt  DateTime    @default(now())
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flashcards Flashcard[]
+
+  @@map("flashcard_sets")
+}
+
+model Flashcard {
+  id         String       @id @default(cuid())
+  question   String
+  answer     String
+  difficulty Int          @default(0)
+  setId      String
+  set        FlashcardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  @@map("flashcards")
+}
+
+model TimerSession {
+  id          String   @id @default(cuid())
+  duration    Int
+  type        String   @default("pomodoro")
+  taskId      String?
+  taskTitle   String?
+  userId      String
+  completedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("timer_sessions")
+}
+
+model AISession {
+  id        String   @id @default(cuid())
+  title     String   @default("New Chat")
+  messages  Json     @default("[]")
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_sessions")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  link      String?
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model PdfDocument {
+  id             String         @id @default(cuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  fileName       String
+  pageCount      Int            @default(0)
+  charCount      Int            @default(0)
+  extractedText  String         @db.Text
+  summary        String?        @db.Text
+  summaryFull    String?        @db.Text
+  summaryFigures Json?
+  status         PdfStatus      @default(PROCESSING)
+  deletedAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  challenges     PdfChallenge[]
+
+  @@index([userId])
+  @@map("pdf_documents")
+}
+
+model VideoSummary {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  sourceUrl   String
+  sourceType  String        @default("youtube")
+  transcript  String?       @db.Text
+  summary     String?       @db.Text
+  duration    Int?
+  status      VideoStatus   @default(PROCESSING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([userId])
+  @@map("video_summaries")
+}
+
+enum VideoStatus {
+  PROCESSING
+  READY
+  ERROR
+}
+
+model PdfChallenge {
+  id         String      @id @default(cuid())
+  documentId String
+  document   PdfDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  question   String
+  answer     String
+  difficulty String      @default("medium")
+  sortOrder  Int         @default(0)
+  createdAt  DateTime    @default(now())
+
+  @@index([documentId])
+  @@map("pdf_challenges")
+}
+
+enum PdfStatus {
+  PROCESSING
+  READY
+  ERROR
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum GroupRole {
+  ADMIN
+  MEMBER
+}
+
+enum AttendanceStatus {
+  HADIR
+  TIDAK_HADIR
+  SAKIT
+  IZIN
+}
+
+enum SessionMode {
+  MAYA
+  LANGSUNG
+}
