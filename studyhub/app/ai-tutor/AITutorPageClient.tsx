@@ -155,10 +155,9 @@ export default function AITutorPageClient() {
     setIsListening(true)
 
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
 
     if (!SpeechRecognitionClass) {
-      setVoiceError(`Browser tidak mendukung.${isIOS ? ' iPhone belum support.' : ' Gunakan Chrome/Edge.'}`)
+      setVoiceError('Browser tidak mendukung. Gunakan Chrome/Edge.')
       setIsListening(false)
       setUseTextMode(true)
       return
@@ -183,15 +182,6 @@ export default function AITutorPageClient() {
       setIsListening(true)
       setVoiceTranscript('')
       setVoiceError('')
-      // On iOS, show message about needing to tap screen to enable mic
-      if (isIOS) {
-        setVoiceError('🎤 Tap anywhere on screen to enable microphone')
-        setTimeout(() => {
-          if (!speechDetected) {
-            setVoiceError('')
-          }
-        }, 3000)
-      }
     }
 
     recognition.onresult = async (event: any) => {
@@ -221,14 +211,10 @@ export default function AITutorPageClient() {
         // Normal - no speech detected, restart listening
         startListening()
       } else if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-        if (isIOS) {
-          setVoiceError('🔒 Allow microphone di Safari settings: Settings → Safari → Microphone → Allow')
-        } else {
-          setVoiceError('🔒 Microphone diblokir. Cek settings: chrome://settings/content/microphone')
-        }
+        setVoiceError('🔒 Microphone diblokir. Cek browser settings.')
         setUseTextMode(true)
       } else if (event.error === 'audio-capture') {
-        setVoiceError('❌ Microphone tidak terdeteksi. Pastikan device terinstall.')
+        setVoiceError('❌ Microphone tidak terdeteksi.')
         setUseTextMode(true)
       } else if (event.error === 'network') {
         setVoiceError('🌐 Error jaringan. Coba lagi.')
@@ -270,7 +256,8 @@ export default function AITutorPageClient() {
 
   const processVoiceInput = async (text: string) => {
     if (!text.trim()) {
-      startListening()
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      if (!isIOS) startListening()
       return
     }
 
@@ -281,14 +268,14 @@ export default function AITutorPageClient() {
     setSpeechDetected(true)
 
     try {
-      const { data } = await axios.post('/api/ai', {
+      // Direct API call without trying to fetch session first
+      const response = await axios.post('/api/ai', {
         message: text,
-        sessionId: sessionId || undefined,
         mode: aiMode,
         historyOverride: newHistory.slice(-10),
-      })
+      }, { timeout: 25000 })
 
-      const reply = data.reply || 'Maaf, saya tidak bisa menjawab saat ini.'
+      const reply = response.data?.reply || 'Maaf, saya tidak bisa menjawab saat ini.'
 
       // Clean reply - remove action blocks and markdown
       const cleanReply = reply
@@ -302,73 +289,65 @@ export default function AITutorPageClient() {
       setConversationHistory(prev => [...prev, { role: 'assistant' as const, content: cleanReply }])
       setVoiceResponse(cleanReply)
 
-      // Speak the response
-      await speakText(cleanReply)
+      // Speak the response (async, don't wait)
+      speakText(cleanReply).catch(console.error)
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Voice processing error:', err)
-      setVoiceResponse('Maaf, terjadi kesalahan. Coba lagi.')
-      await speakText('Maaf, terjadi kesalahan. Coba lagi.')
+      let errorMsg = 'Maaf, terjadi kesalahan. Coba lagi.'
+      if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+        errorMsg = 'Koneksi lambat. Coba lagi.'
+      } else if (err?.response?.status === 401) {
+        errorMsg = 'Sesi berakhir. Refresh page.'
+      } else if (!navigator.onLine) {
+        errorMsg = 'Offline. Cek koneksi internet.'
+      }
+      setVoiceResponse(errorMsg)
+      speakText(errorMsg).catch(() => {})
     }
 
-    // Continue listening
-    startListening()
+    // Continue listening (skip on iOS - speech recognition not well supported)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    if (!isIOS) startListening()
   }
 
   const speakText = (text: string) => {
     return new Promise<void>((resolve) => {
-      // iOS Safari requires user interaction first to enable audio
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
-
-      if (isIOS) {
-        // Try to unlock audio context on iOS
-        const unlockAudio = () => {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-          if (ctx.state === 'suspended') {
-            ctx.resume()
-          }
-        }
-        unlockAudio()
-      }
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
 
       // Cancel any ongoing speech
       window.speechSynthesis.cancel()
 
-      // Small delay for iOS to process
-      const speakNow = () => {
-        const utterance = new SpeechSynthesisUtterance(text)
-        utterance.lang = 'id-ID'
-        utterance.rate = isIOS ? 1.0 : 1.1 // iOS slower
-        utterance.pitch = 1
-
-        utterance.onstart = () => setIsSpeaking(true)
-        utterance.onend = () => {
-          setIsSpeaking(false)
-          resolve()
-        }
-        utterance.onerror = (e: any) => {
-          console.error('Speech error:', e)
-          setIsSpeaking(false)
-          resolve()
-        }
-
-        // Try to get voices (async on iOS)
-        const voices = window.speechSynthesis.getVoices()
-        if (voices.length > 0) {
-          // Prefer Indonesian voice
-          const idVoice = voices.find((v: SpeechSynthesisVoice) => v.lang.startsWith('id'))
-          if (idVoice) utterance.voice = idVoice
-        }
-
-        speechSynthRef.current = utterance
-        window.speechSynthesis.speak(utterance)
+      // On iOS, need to unlock audio with a blank audio context first
+      if (isIOS && typeof window.AudioContext !== 'undefined') {
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+          if (ctx.state === 'suspended') {
+            ctx.resume()
+          }
+        } catch { /* ignore */ }
       }
 
-      if (isIOS) {
-        setTimeout(speakNow, 100)
-      } else {
-        speakNow()
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = 'id-ID'
+      utterance.rate = isIOS ? 0.95 : 1.0
+      utterance.pitch = 1
+
+      utterance.onstart = () => {
+        setIsSpeaking(true)
       }
+      utterance.onend = () => {
+        setIsSpeaking(false)
+        resolve()
+      }
+      utterance.onerror = (e: any) => {
+        console.error('Speech synthesis error:', e)
+        setIsSpeaking(false)
+        resolve()
+      }
+
+      speechSynthRef.current = utterance
+      window.speechSynthesis.speak(utterance)
     })
   }
 
