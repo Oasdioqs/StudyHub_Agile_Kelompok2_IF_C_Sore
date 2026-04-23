@@ -315,6 +315,23 @@ export default function AITutorPageClient() {
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = 'id-ID'
     utterance.rate = 1.0
+    utterance.volume = 1.0
+    utterance.pitch = 1.0
+
+    // Try to get Indonesian voice first, fallback to any available
+    const voices = window.speechSynthesis.getVoices()
+    const idVoice = voices.find(v => v.lang.startsWith('id'))
+    if (idVoice) {
+      utterance.voice = idVoice
+    } else {
+      // For mobile, try to use any female voice or first available
+      const preferredVoice = voices.find(v =>
+        v.lang.includes('id') ||
+        v.name.toLowerCase().includes('female') ||
+        v.name.toLowerCase().includes('wanita')
+      )
+      if (preferredVoice) utterance.voice = preferredVoice
+    }
 
     utterance.onstart = () => {
       if (callActiveRef.current) {
@@ -3726,27 +3743,72 @@ export default function AITutorPageClient() {
               </div>
             )}
 
-            {/* Loading Spinner for Thinking */}
+            {/* Loading Spinner for Thinking - Enhanced */}
             {callStatus === 'thinking' && (
               <div style={{
                 position: 'absolute',
                 top: '50%', left: '50%',
                 transform: 'translate(-50%, -50%)',
                 width: 200, height: 200,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}>
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} style={{
+                {/* Brain/Think Icon */}
+                <div style={{
+                  position: 'relative',
+                  width: 80,
+                  height: 80,
+                }}>
+                  {/* Pulsing rings */}
+                  <div style={{
                     position: 'absolute',
                     top: '50%', left: '50%',
-                    width: 160,
-                    height: 160,
-                    border: '4px solid transparent',
-                    borderTopColor: 'rgba(245, 158, 11, 0.8)',
+                    transform: 'translate(-50%, -50%)',
+                    width: 100, height: 100,
                     borderRadius: '50%',
-                    animation: 'spin 1s linear infinite',
-                    animationDelay: `${i * 0.33}s`,
+                    border: '2px solid rgba(245, 158, 11, 0.3)',
+                    animation: 'thinkPulse 1.5s ease-out infinite',
                   }} />
-                ))}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%', left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 100, height: 100,
+                    borderRadius: '50%',
+                    border: '2px solid rgba(245, 158, 11, 0.3)',
+                    animation: 'thinkPulse 1.5s ease-out infinite 0.5s',
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%', left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 100, height: 100,
+                    borderRadius: '50%',
+                    border: '2px solid rgba(245, 158, 11, 0.3)',
+                    animation: 'thinkPulse 1.5s ease-out infinite 1s',
+                  }} />
+                  {/* Center icon */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%', left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 60, height: 60,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 30px rgba(245, 158, 11, 0.6)',
+                    animation: 'thinkBounce 0.8s ease-in-out infinite',
+                  }}>
+                    <i className="bi bi-lightning-fill" style={{
+                      fontSize: 28,
+                      color: '#fff',
+                      animation: 'thinkFlash 0.6s ease-in-out infinite',
+                    }} />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -4067,6 +4129,18 @@ export default function AITutorPageClient() {
             @keyframes soundBar {
               0% { transform: scaleY(0.3); }
               100% { transform: scaleY(1.2); }
+            }
+            @keyframes thinkPulse {
+              0% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+              100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+            }
+            @keyframes thinkBounce {
+              0%, 100% { transform: translate(-50%, -50%) scale(1); }
+              50% { transform: translate(-50%, -50%) scale(1.1); }
+            }
+            @keyframes thinkFlash {
+              0%, 100% { opacity: 1; }
+              50% { opacity: 0.5; }
             }
           `}</style>
         </div>
