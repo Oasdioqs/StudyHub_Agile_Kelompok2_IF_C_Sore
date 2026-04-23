@@ -105,8 +105,6 @@ export default function AITutorPageClient() {
   const [callStatus, setCallStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle')
   const [callTranscript, setCallTranscript] = useState('')
   const [callResponse, setCallResponse] = useState('')
-  const [callHistory, setCallHistory] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
-  const [isUserSpeaking, setIsUserSpeaking] = useState(false)
   const [micError, setMicError] = useState<string | null>(null)
   const callActiveRef = useRef(false)
   const callStatusRef = useRef<'idle' | 'listening' | 'thinking' | 'speaking'>('idle')
@@ -117,6 +115,9 @@ export default function AITutorPageClient() {
   const pendingTranscriptRef = useRef<string>('')
   const silenceThreshold = 1200 // ms of silence before sending
 
+  // ── Call Mode persistent history ─────────────────────────────────────────────
+  const callHistoryRef = useRef<Array<{role: 'user' | 'assistant', content: string}>>([])
+
   // Start Call Mode
   const startCallMode = async () => {
     setIsCallMode(true)
@@ -125,8 +126,8 @@ export default function AITutorPageClient() {
     setCallStatus('listening')
     setCallTranscript('')
     setCallResponse('')
-    setCallHistory([])
     setMicError(null)
+    // Keep existing call history, don't reset
 
     // Small delay to ensure state is set
     await new Promise(resolve => setTimeout(resolve, 100))
@@ -138,7 +139,7 @@ export default function AITutorPageClient() {
     callActiveRef.current = false
     setIsCallMode(false)
     setCallStatus('idle')
-    setIsUserSpeaking(false)
+    callStatusRef.current = 'idle'
     stopCallListening()
     window.speechSynthesis.cancel()
 
@@ -182,30 +183,26 @@ export default function AITutorPageClient() {
     recognition.onresult = (event: any) => {
       if (!callActiveRef.current || callStatusRef.current !== 'listening') return
 
-      hasReceivedSpeech = true // Mark that we got speech
+      hasReceivedSpeech = true
       let transcript = ''
       for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript
       }
 
       setCallTranscript(transcript)
-      setIsUserSpeaking(true)
       lastSpeechTimeRef.current = Date.now()
       pendingTranscriptRef.current = transcript.trim()
 
-      // Clear existing silence timer
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current)
       }
 
-      // Set new silence timer - if no new speech for threshold, process
       if (transcript.trim().length > 0 && callActiveRef.current && callStatusRef.current === 'listening') {
         silenceTimerRef.current = setTimeout(() => {
           if (callActiveRef.current && pendingTranscriptRef.current.length > 0 && callStatusRef.current === 'listening') {
             const finalText = pendingTranscriptRef.current
             pendingTranscriptRef.current = ''
             setCallTranscript('')
-            setIsUserSpeaking(false)
             processCallInput(finalText)
           }
         }, silenceThreshold)
@@ -221,7 +218,6 @@ export default function AITutorPageClient() {
       }
 
       if (event.error === 'no-speech' && callActiveRef.current && callStatusRef.current === 'listening') {
-        setIsUserSpeaking(false)
         setTimeout(() => {
           if (callActiveRef.current && callStatusRef.current === 'listening') startCallListening()
         }, 500)
@@ -265,8 +261,9 @@ export default function AITutorPageClient() {
     callStatusRef.current = 'thinking'
     setCallStatus('thinking')
 
-    const newHistory = [...callHistory, { role: 'user' as const, content: text }]
-    setCallHistory(newHistory)
+    // Use ref for persistent history
+    const newHistory = [...callHistoryRef.current, { role: 'user' as const, content: text }]
+    callHistoryRef.current = newHistory
     setCallTranscript('')
     setCallResponse('Memproses...')
 
@@ -287,7 +284,7 @@ export default function AITutorPageClient() {
         .replace(/\n+/g, '. ')
         .trim()
 
-      setCallHistory(prev => [...prev, { role: 'assistant' as const, content: cleanReply }])
+      callHistoryRef.current = [...callHistoryRef.current, { role: 'assistant' as const, content: cleanReply }]
       setCallResponse(cleanReply)
 
       if (callActiveRef.current) {
@@ -298,7 +295,7 @@ export default function AITutorPageClient() {
     } catch (err) {
       const errorMsg = 'Maaf, terjadi kesalahan. Coba lagi.'
       setCallResponse(errorMsg)
-      setCallHistory(prev => [...prev, { role: 'assistant' as const, content: errorMsg }])
+      callHistoryRef.current = [...callHistoryRef.current, { role: 'assistant' as const, content: errorMsg }]
       if (callActiveRef.current) {
         callStatusRef.current = 'speaking'
         setCallStatus('speaking')
