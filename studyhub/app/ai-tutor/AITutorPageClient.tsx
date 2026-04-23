@@ -107,7 +107,9 @@ export default function AITutorPageClient() {
   const [callResponse, setCallResponse] = useState('')
   const [callHistory, setCallHistory] = useState<Array<{role: 'user' | 'assistant', content: string}>>([])
   const [isUserSpeaking, setIsUserSpeaking] = useState(false)
+  const [micError, setMicError] = useState<string | null>(null)
   const callActiveRef = useRef(false)
+  const callStatusRef = useRef<'idle' | 'listening' | 'thinking' | 'speaking'>('idle')
   const recognitionRef = useRef<any>(null)
   const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null)
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -116,13 +118,18 @@ export default function AITutorPageClient() {
   const silenceThreshold = 1200 // ms of silence before sending
 
   // Start Call Mode
-  const startCallMode = () => {
+  const startCallMode = async () => {
     setIsCallMode(true)
     callActiveRef.current = true
+    callStatusRef.current = 'listening'
     setCallStatus('listening')
     setCallTranscript('')
     setCallResponse('')
     setCallHistory([])
+    setMicError(null)
+
+    // Small delay to ensure state is set
+    await new Promise(resolve => setTimeout(resolve, 100))
     startCallListening()
   }
 
@@ -147,11 +154,15 @@ export default function AITutorPageClient() {
   // Start listening in call mode (continuous with silence detection)
   const startCallListening = () => {
     if (typeof window === 'undefined' || !callActiveRef.current) return
-    if (callStatus !== 'listening') return // Don't start if not in listening state
+    if (callStatusRef.current !== 'listening') return // Don't start if not in listening state
 
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognitionClass) return
+    if (!SpeechRecognitionClass) {
+      setMicError('Speech Recognition tidak tersedia di browser ini. Gunakan Chrome atau Edge.')
+      return
+    }
 
+    // Stop existing recognition
     if (recognitionRef.current) {
       try { recognitionRef.current.stop() } catch {}
     }
@@ -165,12 +176,12 @@ export default function AITutorPageClient() {
     let hasReceivedSpeech = false
 
     recognition.onstart = () => {
-      if (callActiveRef.current && callStatus === 'listening') {
-        setIsUserSpeaking(false)
-      }
+      setMicError(null)
     }
 
     recognition.onresult = (event: any) => {
+      if (!callActiveRef.current || callStatusRef.current !== 'listening') return
+
       hasReceivedSpeech = true // Mark that we got speech
       let transcript = ''
       for (let i = 0; i < event.results.length; i++) {
@@ -188,9 +199,9 @@ export default function AITutorPageClient() {
       }
 
       // Set new silence timer - if no new speech for threshold, process
-      if (transcript.trim().length > 0 && callActiveRef.current && callStatus === 'listening') {
+      if (transcript.trim().length > 0 && callActiveRef.current && callStatusRef.current === 'listening') {
         silenceTimerRef.current = setTimeout(() => {
-          if (callActiveRef.current && pendingTranscriptRef.current.length > 0 && callStatus === 'listening') {
+          if (callActiveRef.current && pendingTranscriptRef.current.length > 0 && callStatusRef.current === 'listening') {
             const finalText = pendingTranscriptRef.current
             pendingTranscriptRef.current = ''
             setCallTranscript('')
@@ -203,24 +214,30 @@ export default function AITutorPageClient() {
 
     recognition.onerror = (event: any) => {
       hasReceivedSpeech = false // Reset on error
-      if (event.error === 'no-speech' && callActiveRef.current && callStatus === 'listening') {
+
+      if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+        setMicError('Izin mikrofon ditolak. Mohon izinkan akses mikrofon di pengaturan browser.')
+        return
+      }
+
+      if (event.error === 'no-speech' && callActiveRef.current && callStatusRef.current === 'listening') {
         setIsUserSpeaking(false)
         setTimeout(() => {
-          if (callActiveRef.current && callStatus === 'listening') startCallListening()
+          if (callActiveRef.current && callStatusRef.current === 'listening') startCallListening()
         }, 500)
       } else if (event.error !== 'aborted' && event.error !== 'no-speech' && callActiveRef.current) {
         setTimeout(() => {
-          if (callActiveRef.current && callStatus === 'listening') startCallListening()
+          if (callActiveRef.current && callStatusRef.current === 'listening') startCallListening()
         }, 1000)
       }
     }
 
     recognition.onend = () => {
       // Only restart if we actually received speech and we're still supposed to be listening
-      if (callActiveRef.current && callStatus === 'listening' && hasReceivedSpeech) {
+      if (callActiveRef.current && callStatusRef.current === 'listening' && hasReceivedSpeech) {
         hasReceivedSpeech = false
         setTimeout(() => {
-          if (callActiveRef.current && callStatus === 'listening') startCallListening()
+          if (callActiveRef.current && callStatusRef.current === 'listening') startCallListening()
         }, 300)
       }
     }
@@ -228,7 +245,9 @@ export default function AITutorPageClient() {
     recognitionRef.current = recognition
     try {
       recognition.start()
-    } catch {}
+    } catch (err) {
+      setMicError('Gagal mengakses mikrofon. Pastikan mikrofon terhubung dan tidak sedang digunakan aplikasi lain.')
+    }
   }
 
   // Stop call listening
@@ -243,6 +262,7 @@ export default function AITutorPageClient() {
     if (!text.trim() || !callActiveRef.current) return
 
     stopCallListening()
+    callStatusRef.current = 'thinking'
     setCallStatus('thinking')
 
     const newHistory = [...callHistory, { role: 'user' as const, content: text }]
@@ -271,6 +291,7 @@ export default function AITutorPageClient() {
       setCallResponse(cleanReply)
 
       if (callActiveRef.current) {
+        callStatusRef.current = 'speaking'
         setCallStatus('speaking')
         speakCallText(cleanReply)
       }
@@ -279,6 +300,7 @@ export default function AITutorPageClient() {
       setCallResponse(errorMsg)
       setCallHistory(prev => [...prev, { role: 'assistant' as const, content: errorMsg }])
       if (callActiveRef.current) {
+        callStatusRef.current = 'speaking'
         setCallStatus('speaking')
         speakCallText(errorMsg)
       }
@@ -295,10 +317,14 @@ export default function AITutorPageClient() {
     utterance.rate = 1.0
 
     utterance.onstart = () => {
-      if (callActiveRef.current) setCallStatus('speaking')
+      if (callActiveRef.current) {
+        callStatusRef.current = 'speaking'
+        setCallStatus('speaking')
+      }
     }
     utterance.onend = () => {
       if (callActiveRef.current) {
+        callStatusRef.current = 'listening'
         setCallStatus('listening')
         setCallResponse('')
         setTimeout(() => startCallListening(), 500)
@@ -306,6 +332,7 @@ export default function AITutorPageClient() {
     }
     utterance.onerror = () => {
       if (callActiveRef.current) {
+        callStatusRef.current = 'listening'
         setCallStatus('listening')
         setTimeout(() => startCallListening(), 500)
       }
@@ -317,7 +344,7 @@ export default function AITutorPageClient() {
 
   // Interrupt AI speech when user starts speaking
   const interruptAISpeech = () => {
-    if (callStatus !== 'speaking') return
+    if (callStatusRef.current !== 'speaking') return
 
     window.speechSynthesis.cancel()
     stopCallListening()
@@ -331,6 +358,7 @@ export default function AITutorPageClient() {
       try { recognitionRef.current.stop() } catch {}
     }
 
+    callStatusRef.current = 'listening'
     setCallStatus('listening')
     setCallResponse('')
     setIsUserSpeaking(true)
@@ -3758,6 +3786,37 @@ export default function AITutorPageClient() {
               animation: 'blink 1s ease-in-out infinite',
             }}>
               Klik di mana saja untuk interromsi
+            </div>
+          )}
+
+          {/* Mic Error Display */}
+          {micError && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(239, 68, 68, 0.1))',
+              border: '1px solid rgba(239, 68, 68, 0.5)',
+              borderRadius: 16,
+              padding: '16px 20px',
+              marginBottom: 20,
+              maxWidth: 400,
+              textAlign: 'center',
+              backdropFilter: 'blur(10px)',
+            }}>
+              <i className="bi bi-exclamation-triangle-fill" style={{ fontSize: 24, color: '#ef4444', marginBottom: 8, display: 'block' }} />
+              <div style={{ fontSize: 14, color: '#fff', marginBottom: 8 }}>{micError}</div>
+              <button
+                onClick={() => { setMicError(null); startCallListening() }}
+                style={{
+                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '8px 16px',
+                  color: '#fff',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Coba Lagi
+              </button>
             </div>
           )}
 
