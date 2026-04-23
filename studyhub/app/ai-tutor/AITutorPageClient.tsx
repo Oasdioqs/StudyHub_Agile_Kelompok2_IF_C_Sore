@@ -375,10 +375,7 @@ export default function AITutorPageClient() {
     callStatusRef.current = 'listening'
     setCallStatus('listening')
     setCallResponse('')
-    setIsUserSpeaking(true)
     lastSpeechTimeRef.current = Date.now()
-
-    // Start recognition immediately
     setTimeout(() => startCallListening(), 100)
   }
 
