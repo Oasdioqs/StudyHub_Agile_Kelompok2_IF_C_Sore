@@ -147,6 +147,7 @@ export default function AITutorPageClient() {
   // Start listening in call mode (continuous with silence detection)
   const startCallListening = () => {
     if (typeof window === 'undefined' || !callActiveRef.current) return
+    if (callStatus !== 'listening') return // Don't start if not in listening state
 
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognitionClass) return
@@ -159,20 +160,21 @@ export default function AITutorPageClient() {
     recognition.continuous = true // Continuous for silence detection
     recognition.interimResults = true
     recognition.lang = 'id-ID'
+    recognition.maxAlternatives = 1
+
+    let hasReceivedSpeech = false
 
     recognition.onstart = () => {
-      if (callActiveRef.current) {
-        setCallStatus('listening')
+      if (callActiveRef.current && callStatus === 'listening') {
         setIsUserSpeaking(false)
       }
     }
 
     recognition.onresult = (event: any) => {
+      hasReceivedSpeech = true // Mark that we got speech
       let transcript = ''
-      let hasFinal = false
       for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript
-        if (event.results[i].isFinal) hasFinal = true
       }
 
       setCallTranscript(transcript)
@@ -200,19 +202,26 @@ export default function AITutorPageClient() {
     }
 
     recognition.onerror = (event: any) => {
-      if (event.error === 'no-speech' && callActiveRef.current) {
-        // No speech detected, but don't interrupt AI speaking
+      hasReceivedSpeech = false // Reset on error
+      if (event.error === 'no-speech' && callActiveRef.current && callStatus === 'listening') {
         setIsUserSpeaking(false)
-        // Keep listening for more
-        setTimeout(() => startCallListening(), 500)
-      } else if (event.error !== 'aborted' && callActiveRef.current) {
-        setTimeout(() => startCallListening(), 1000)
+        setTimeout(() => {
+          if (callActiveRef.current && callStatus === 'listening') startCallListening()
+        }, 500)
+      } else if (event.error !== 'aborted' && event.error !== 'no-speech' && callActiveRef.current) {
+        setTimeout(() => {
+          if (callActiveRef.current && callStatus === 'listening') startCallListening()
+        }, 1000)
       }
     }
 
     recognition.onend = () => {
-      if (callActiveRef.current && callStatus === 'listening') {
-        setTimeout(() => startCallListening(), 300)
+      // Only restart if we actually received speech and we're still supposed to be listening
+      if (callActiveRef.current && callStatus === 'listening' && hasReceivedSpeech) {
+        hasReceivedSpeech = false
+        setTimeout(() => {
+          if (callActiveRef.current && callStatus === 'listening') startCallListening()
+        }, 300)
       }
     }
 
@@ -3752,79 +3761,182 @@ export default function AITutorPageClient() {
             </div>
           )}
 
-          {/* Transcript & Response */}
-          <div style={{ width: '90%', maxWidth: 500, textAlign: 'center' }}>
+          {/* Transcript & Response Cards - Redesigned */}
+          <div style={{
+            width: '90%',
+            maxWidth: 520,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+            marginBottom: 100,
+          }}>
             {callTranscript && (
               <div style={{
-                background: 'rgba(139, 92, 246, 0.15)',
-                border: '1px solid rgba(139, 92, 246, 0.4)',
-                borderRadius: 20,
+                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.1))',
+                border: '1px solid rgba(139, 92, 246, 0.5)',
+                borderRadius: 24,
                 padding: '20px 24px',
-                marginBottom: 16,
-                backdropFilter: 'blur(10px)',
+                backdropFilter: 'blur(20px)',
                 position: 'relative',
                 overflow: 'hidden',
+                boxShadow: '0 8px 32px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
               }}>
+                {/* Animated gradient border glow */}
                 <div style={{
                   position: 'absolute',
-                  top: -50, left: -50,
-                  width: 100, height: 100,
-                  borderRadius: '50%',
-                  background: 'rgba(139, 92, 246, 0.2)',
-                  filter: 'blur(30px)',
+                  top: -2, left: -2, right: -2, bottom: -2,
+                  borderRadius: 26,
+                  background: 'linear-gradient(45deg, rgba(139, 92, 246, 0.6), transparent, rgba(139, 92, 246, 0.6))',
+                  backgroundSize: '200% 200%',
+                  animation: 'gradientShift 2s ease infinite',
+                  zIndex: -1,
                 }} />
-                <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 8, position: 'relative' }}>Kamu:</div>
-                <div style={{ fontSize: 18, fontWeight: 500, position: 'relative' }}>{callTranscript}</div>
                 <div style={{
                   position: 'absolute',
-                  bottom: 0, right: 0,
-                  width: 60, height: 60,
-                  borderRadius: '50%',
-                  background: 'rgba(139, 92, 246, 0.1)',
-                  filter: 'blur(20px)',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  borderRadius: 24,
+                  background: 'linear-gradient(135deg, rgba(20, 20, 40, 0.9), rgba(30, 30, 60, 0.95))',
+                  zIndex: -1,
                 }} />
+                {/* User avatar */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  marginBottom: 12,
+                }}>
+                  <div style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 20px rgba(139, 92, 246, 0.5)',
+                  }}>
+                    <i className="bi bi-person-fill" style={{ fontSize: 18, color: '#fff' }} />
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Kamu</div>
+                  {/* Speaking indicator */}
+                  <div style={{
+                    marginLeft: 'auto',
+                    display: 'flex',
+                    gap: 3,
+                    alignItems: 'flex-end',
+                    height: 16,
+                  }}>
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} style={{
+                        width: 3,
+                        height: 8 + (i % 2) * 6,
+                        borderRadius: 2,
+                        background: '#a78bfa',
+                        animation: `soundBar 0.4s ease-in-out infinite alternate`,
+                        animationDelay: `${i * 0.1}s`,
+                      }} />
+                    ))}
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: 18,
+                  fontWeight: 500,
+                  color: '#fff',
+                  lineHeight: 1.6,
+                  textAlign: 'left',
+                  paddingLeft: 48,
+                }}>{callTranscript}</div>
               </div>
             )}
             {callResponse && (
               <div style={{
-                background: 'rgba(16, 185, 129, 0.15)',
-                border: '1px solid rgba(16, 185, 129, 0.4)',
-                borderRadius: 20,
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(16, 185, 129, 0.1))',
+                border: '1px solid rgba(16, 185, 129, 0.5)',
+                borderRadius: 24,
                 padding: '20px 24px',
-                backdropFilter: 'blur(10px)',
+                backdropFilter: 'blur(20px)',
                 position: 'relative',
                 overflow: 'hidden',
+                boxShadow: '0 8px 32px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
               }}>
                 <div style={{
                   position: 'absolute',
-                  top: -50, right: -50,
-                  width: 100, height: 100,
-                  borderRadius: '50%',
-                  background: 'rgba(16, 185, 129, 0.2)',
-                  filter: 'blur(30px)',
+                  top: -2, left: -2, right: -2, bottom: -2,
+                  borderRadius: 26,
+                  background: 'linear-gradient(45deg, rgba(16, 185, 129, 0.6), transparent, rgba(16, 185, 129, 0.6))',
+                  backgroundSize: '200% 200%',
+                  animation: 'gradientShift 2s ease infinite',
+                  zIndex: -1,
                 }} />
-                <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 8, position: 'relative' }}>AI:</div>
-                <div style={{ fontSize: 18, fontWeight: 500, position: 'relative' }}>{callResponse}</div>
                 <div style={{
                   position: 'absolute',
-                  bottom: 0, left: 0,
-                  width: 60, height: 60,
-                  borderRadius: '50%',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  filter: 'blur(20px)',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  borderRadius: 24,
+                  background: 'linear-gradient(135deg, rgba(16, 40, 30, 0.9), rgba(20, 50, 40, 0.95))',
+                  zIndex: -1,
                 }} />
+                {/* Bot avatar */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  marginBottom: 12,
+                }}>
+                  <div style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #34d399, #10b981)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 20px rgba(16, 185, 129, 0.5)',
+                  }}>
+                    <i className="bi bi-robot" style={{ fontSize: 18, color: '#fff' }} />
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>StudyBot</div>
+                  {callStatus === 'speaking' && (
+                    <div style={{
+                      marginLeft: 'auto',
+                      display: 'flex',
+                      gap: 3,
+                      alignItems: 'flex-end',
+                      height: 16,
+                    }}>
+                      {[...Array(4)].map((_, i) => (
+                        <div key={i} style={{
+                          width: 3,
+                          height: 8 + (i % 2) * 6,
+                          borderRadius: 2,
+                          background: '#34d399',
+                          animation: `soundBar 0.4s ease-in-out infinite alternate`,
+                          animationDelay: `${i * 0.1}s`,
+                        }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={{
+                  fontSize: 18,
+                  fontWeight: 500,
+                  color: '#fff',
+                  lineHeight: 1.6,
+                  textAlign: 'left',
+                  paddingLeft: 48,
+                }}>{callResponse}</div>
               </div>
             )}
           </div>
 
-          {/* End Call Button */}
+          {/* End Call Button - Top Right Corner */}
           <button
             onClick={endCallMode}
             style={{
-              position: 'absolute',
-              bottom: 60,
-              width: 72,
-              height: 72,
+              position: 'fixed',
+              top: 40,
+              right: 40,
+              width: 64,
+              height: 64,
               borderRadius: '50%',
               background: 'linear-gradient(135deg, #ef4444, #dc2626)',
               border: 'none',
@@ -3835,6 +3947,7 @@ export default function AITutorPageClient() {
               boxShadow: '0 8px 32px rgba(239, 68, 68, 0.5), 0 0 20px rgba(239, 68, 68, 0.3)',
               cursor: 'pointer',
               transition: 'transform 0.2s, box-shadow 0.2s',
+              zIndex: 10001,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.1)'
@@ -3845,7 +3958,7 @@ export default function AITutorPageClient() {
               e.currentTarget.style.boxShadow = '0 8px 32px rgba(239, 68, 68, 0.5), 0 0 20px rgba(239, 68, 68, 0.3)'
             }}
           >
-            <i className="bi bi-telephone-x-fill" style={{ fontSize: 30 }} />
+            <i className="bi bi-x-lg" style={{ fontSize: 24 }} />
           </button>
 
           <style>{`
@@ -3886,6 +3999,15 @@ export default function AITutorPageClient() {
             @keyframes blink {
               0%, 100% { opacity: 0.5; }
               50% { opacity: 0.8; }
+            }
+            @keyframes gradientShift {
+              0% { background-position: 0% 50%; }
+              50% { background-position: 100% 50%; }
+              100% { background-position: 0% 50%; }
+            }
+            @keyframes soundBar {
+              0% { transform: scaleY(0.3); }
+              100% { transform: scaleY(1.2); }
             }
           `}</style>
         </div>
