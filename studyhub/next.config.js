@@ -24,6 +24,7 @@ const nextConfig = {
   poweredByHeader: false,
   experimental: {
     serverComponentsExternalPackages: ['mammoth', 'unzipper'],
+    instrumentationHook: true,
   },
   // Exclude native binaries from webpack bundling — loaded at runtime by Node.js
   webpack(config, { isServer }) {
@@ -73,7 +74,6 @@ try {
       project: process.env.SENTRY_PROJECT,
       widenClientFileUpload: true,
       hideSourceMaps: true,
-      disableLogger: true,
     })
   }
 } catch {
