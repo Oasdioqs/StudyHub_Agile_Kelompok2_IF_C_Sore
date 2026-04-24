@@ -58,12 +58,67 @@ export const RATE_LIMITS = {
   auth: { limit: 10, windowMs: 15 * 60 * 1000, keyPrefix: 'auth' },
   // Register: 5 per hour per IP (stricter)
   register: { limit: 5, windowMs: 60 * 60 * 1000, keyPrefix: 'register' },
+  // OTP Verification: 5 attempts per 10 minutes per email+IP combo (prevent brute force)
+  otpVerify: { limit: 5, windowMs: 10 * 60 * 1000, keyPrefix: 'otp' },
+  // OTP Verify Strict: 3 attempts per 15 minutes per email (for failed attempts tracking)
+  otpFailed: { limit: 3, windowMs: 15 * 60 * 1000, keyPrefix: 'otpf' },
   // AI: 30 requests per hour per user
   ai: { limit: 30, windowMs: 60 * 60 * 1000, keyPrefix: 'ai' },
   // API general: 100 per minute per IP
   api: { limit: 100, windowMs: 60 * 1000, keyPrefix: 'api' },
   // Forgot password: 3 per hour per IP
   forgotPassword: { limit: 3, windowMs: 60 * 60 * 1000, keyPrefix: 'forgot' },
+}
+
+// Track failed OTP attempts in memory (per email)
+const failedOtpStore = new Map<string, { count: number; resetAt: number }>()
+
+/**
+ * Check if an email has exceeded failed OTP attempts.
+ * After 3 failed attempts, lock for 15 minutes.
+ */
+export function checkFailedOtp(email: string): { blocked: boolean; remaining: number; resetAt: number } {
+  const key = `otpf:${email.toLowerCase()}`
+  const now = Date.now()
+  const entry = failedOtpStore.get(key)
+
+  if (!entry || now > entry.resetAt) {
+    return { blocked: false, remaining: 2, resetAt: now + 15 * 60 * 1000 }
+  }
+
+  if (entry.count >= 3) {
+    return { blocked: true, remaining: 0, resetAt: entry.resetAt }
+  }
+
+  return { blocked: false, remaining: 2 - entry.count, resetAt: entry.resetAt }
+}
+
+/**
+ * Record a failed OTP attempt.
+ */
+export function recordFailedOtp(email: string): void {
+  const key = `otpf:${email.toLowerCase()}`
+  const now = Date.now()
+  const entry = failedOtpStore.get(key)
+
+  if (!entry || now > entry.resetAt) {
+    failedOtpStore.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 })
+    return
+  }
+
+  entry.count++
+  // Extend reset time if approaching limit
+  if (entry.count >= 3) {
+    entry.resetAt = now + 15 * 60 * 1000
+  }
+}
+
+/**
+ * Clear failed OTP attempts (on successful verification).
+ */
+export function clearFailedOtp(email: string): void {
+  const key = `otpf:${email.toLowerCase()}`
+  failedOtpStore.delete(key)
 }
 
 export function rateLimitResponse(resetAt: number): NextResponse {

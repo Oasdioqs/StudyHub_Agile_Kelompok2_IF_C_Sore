@@ -4,6 +4,16 @@ import { db } from '@/lib/db'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
 import { cookies } from 'next/headers'
+import {
+  checkRateLimit,
+  checkFailedOtp,
+  recordFailedOtp,
+  clearFailedOtp,
+  getIP,
+  RATE_LIMITS,
+  rateLimitResponse,
+} from '@/lib/rate-limit'
+import { sanitizeEmail, sanitizeOtpCode } from '@/lib/sanitize'
 
 const OTP_COOKIE_NAME = 'otp_verified_for'
 const EMAIL_VERIFIED_COOKIE_NAME = 'email_verified_for'
@@ -13,11 +23,35 @@ function sha256(input: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getIP(req)
   const body = await req.json().catch(() => ({}))
   const { email, code } = body as { email?: string; code?: string }
-  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
+  const normalizedEmail = sanitizeEmail(email || '')
 
-  if (!code || typeof code !== 'string' || !/^\d{6}$/.test(code)) {
+  // Check general rate limit per IP
+  const rl = checkRateLimit(ip, RATE_LIMITS.otpVerify)
+  if (!rl.allowed) return rateLimitResponse(rl.resetAt)
+
+  // Check for blocked email (too many failed attempts)
+  if (normalizedEmail) {
+    const blocked = checkFailedOtp(normalizedEmail)
+    if (blocked.blocked) {
+      const retryAfterSec = Math.ceil((blocked.resetAt - Date.now()) / 1000)
+      return NextResponse.json(
+        { message: 'Terlalu banyak percobaan salah. Coba lagi beberapa menit.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.max(retryAfterSec, 60)),
+            'X-RateLimit-Reset': String(Math.ceil(blocked.resetAt / 1000)),
+          },
+        },
+      )
+    }
+  }
+
+  const sanitizedCode = sanitizeOtpCode(code || '')
+  if (!sanitizedCode) {
     return NextResponse.json({ message: 'Kode OTP tidak valid.' }, { status: 400 })
   }
 
@@ -47,10 +81,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'OTP tidak valid atau sudah expired.' }, { status: 400 })
   }
 
-  const expectedHash = sha256(code)
+  const expectedHash = sha256(sanitizedCode)
   const matchedOtp = activeOtps.find((item) => item.codeHash === expectedHash)
+
   if (!matchedOtp) {
+    // Record failed attempt
+    if (normalizedEmail) {
+      recordFailedOtp(normalizedEmail)
+    }
     return NextResponse.json({ message: 'Kode OTP salah.' }, { status: 400 })
+  }
+
+  // Clear failed attempts on success
+  if (normalizedEmail) {
+    clearFailedOtp(normalizedEmail)
   }
 
   await db.loginOtp.update({

@@ -1,21 +1,25 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getMessaging, getToken, onMessage, type Messaging } from 'firebase/messaging'
 
+// Firebase config from environment variables (all are public-safe, used client-side)
 const firebaseConfig = {
-  apiKey: "AIzaSyCNBD6ujsem9MB6As7--wFeRNjAcWTz1sY",
-  authDomain: "studyhub-8e93e.firebaseapp.com",
-  projectId: "studyhub-8e93e",
-  storageBucket: "studyhub-8e93e.firebasestorage.app",
-  messagingSenderId: "108950489599",
-  appId: "1:108950489599:web:d7ee5cf24a2de199973fca",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
 }
 
-export const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
+// Only initialize if config is available
+const app = getApps().length > 0 ? getApp() : (firebaseConfig.apiKey ? initializeApp(firebaseConfig) : null)
+export const firebaseApp = app
 
 let messagingInstance: Messaging | null = null
 
 export function getFirebaseMessaging(): Messaging | null {
   if (typeof window === 'undefined') return null
+  if (!firebaseApp) return null
   if (!messagingInstance) {
     messagingInstance = getMessaging(firebaseApp)
   }

@@ -10,9 +10,13 @@ function PostHogIdentify() {
 
   useEffect(() => {
     if (!session?.user?.id || !process.env.NEXT_PUBLIC_POSTHOG_KEY) return
+    // Sanitize user data before sending to PostHog
+    const sanitizedEmail = String(session.user.email || '').trim().toLowerCase()
+    const sanitizedName = String(session.user.name || '').trim().slice(0, 100)
+
     posthog.identify(session.user.id, {
-      email: session.user.email,
-      name: session.user.name,
+      email: sanitizedEmail,
+      name: sanitizedName,
       isPremium: (session.user as any).isPremium,
     })
   }, [session])
@@ -29,6 +33,8 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       capture_pageleave: true,
       autocapture: false, // manual tracking for control
       persistence: 'localStorage',
+      // Security: Disable remote config fetch to prevent configuration injection
+      bootstrap: {},
       loaded: (ph) => {
         if (process.env.NODE_ENV === 'development') ph.debug()
       },

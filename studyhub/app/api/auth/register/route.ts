@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
 import { resendVerificationEmail, sendWelcomeEmail } from '@/lib/mail'
 import { checkRateLimit, getIP, RATE_LIMITS, rateLimitResponse } from '@/lib/rate-limit'
+import { sanitizeName, sanitizeEmail, sanitizeRefCode, validateEmail } from '@/lib/sanitize'
 
 export async function POST(req: NextRequest) {
   const ip = getIP(req)
@@ -10,14 +11,25 @@ export async function POST(req: NextRequest) {
   if (!rl.allowed) return rateLimitResponse(rl.resetAt)
 
   const body = await req.json().catch(() => ({}))
-  const name = String((body as any).name || '').trim()
-  const email = String((body as any).email || '').trim().toLowerCase()
+  const name = sanitizeName((body as any).name || '')
+  const email = sanitizeEmail((body as any).email || '')
   const password = String((body as any).password || '')
-  const refCode = String((body as any).ref || '').trim().toUpperCase() || null
+  const refCode = sanitizeRefCode((body as any).ref || '')
 
   if (!name || !email || !password) {
     return NextResponse.json({ message: 'Semua field wajib diisi' }, { status: 400 })
   }
+
+  // Validate name length after sanitization
+  if (name.length < 2 || name.length > 100) {
+    return NextResponse.json({ message: 'Nama harus 2-100 karakter' }, { status: 400 })
+  }
+
+  // Validate email format
+  if (!validateEmail(email)) {
+    return NextResponse.json({ message: 'Format email tidak valid' }, { status: 400 })
+  }
+
   if (password.length < 8) {
     return NextResponse.json({ message: 'Password minimal 8 karakter' }, { status: 400 })
   }
