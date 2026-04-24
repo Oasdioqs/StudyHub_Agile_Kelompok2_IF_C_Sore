@@ -1,6 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getMessaging, getToken as getMessagingToken, onMessage, type Messaging } from 'firebase/messaging'
-import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken as getAppCheckToken } from '@firebase/app-check'
 
 // Firebase config from environment variables (all are public-safe, used client-side)
 const firebaseConfig = {
@@ -18,27 +17,15 @@ export const firebaseApp = app
 
 // Initialize Firebase App Check for additional security
 // This helps protect Firebase resources from abuse
+// NOTE: App Check is disabled for now - requires reCAPTCHA Enterprise setup
+// To enable: add NEXT_PUBLIC_RECAPTCHA_SITE_KEY to environment variables
 let appCheckInitialized = false
 
 export function initializeFirebaseAppCheck() {
-  if (typeof window === 'undefined' || !firebaseApp || appCheckInitialized) return
-
-  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
-  if (!recaptchaSiteKey) {
-    console.warn('[Firebase] App Check disabled: NEXT_PUBLIC_RECAPTCHA_SITE_KEY not set')
-    return
-  }
-
-  try {
-    initializeAppCheck(firebaseApp, {
-      provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
-      isTokenAutoRefreshEnabled: true,
-    })
-    appCheckInitialized = true
-    console.log('[Firebase] App Check initialized')
-  } catch (err) {
-    console.error('[Firebase] App Check initialization failed:', err)
-  }
+  // App Check is disabled - uncomment and configure if needed
+  // const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+  // if (recaptchaSiteKey) { ... }
+  return
 }
 
 let messagingInstance: Messaging | null = null
