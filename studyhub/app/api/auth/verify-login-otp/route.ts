@@ -27,6 +27,9 @@ export async function POST(req: NextRequest) {
     const ip = getIP(req)
     const body = await req.json().catch(() => ({}))
     const { email, code } = body as { email?: string; code?: string }
+
+    console.log('[OTP Verify] Received:', { email, codeLength: code?.length })
+
     const normalizedEmail = sanitizeEmail(email || '')
 
     // Check general rate limit per IP
@@ -84,6 +87,11 @@ export async function POST(req: NextRequest) {
     }
 
     const expectedHash = sha256(normalizedCode)
+    console.log('[OTP Verify] Hash:', expectedHash)
+    console.log('[OTP Verify] Active OTPs count:', activeOtps.length)
+    if (activeOtps.length > 0) {
+      console.log('[OTP Verify] Stored hashes:', activeOtps.map(o => o.codeHash))
+    }
     const matchedOtp = activeOtps.find((item) => item.codeHash === expectedHash)
 
     if (!matchedOtp) {
