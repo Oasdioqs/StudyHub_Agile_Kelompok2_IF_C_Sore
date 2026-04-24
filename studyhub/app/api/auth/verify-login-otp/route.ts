@@ -3,17 +3,6 @@ import crypto from 'crypto'
 import { db } from '@/lib/db'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
-import { cookies } from 'next/headers'
-import {
-  checkRateLimit,
-  checkFailedOtp,
-  recordFailedOtp,
-  clearFailedOtp,
-  getIP,
-  RATE_LIMITS,
-  rateLimitResponse,
-} from '@/lib/rate-limit'
-import { sanitizeEmail } from '@/lib/sanitize'
 
 const OTP_COOKIE_NAME = 'otp_verified_for'
 const EMAIL_VERIFIED_COOKIE_NAME = 'email_verified_for'
@@ -24,37 +13,12 @@ function sha256(input: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = getIP(req)
     const body = await req.json().catch(() => ({}))
     const { email, code } = body as { email?: string; code?: string }
 
-    console.log('[OTP Verify] Received:', { email, codeLength: code?.length })
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
 
-    const normalizedEmail = sanitizeEmail(email || '')
-
-    // Check general rate limit per IP
-    const rl = checkRateLimit(ip, RATE_LIMITS.otpVerify)
-    if (!rl.allowed) return rateLimitResponse(rl.resetAt)
-
-    // Check for blocked email (too many failed attempts)
-    if (normalizedEmail) {
-      const blocked = checkFailedOtp(normalizedEmail)
-      if (blocked.blocked) {
-        const retryAfterSec = Math.ceil((blocked.resetAt - Date.now()) / 1000)
-        return NextResponse.json(
-          { message: 'Terlalu banyak percobaan salah. Coba lagi beberapa menit.' },
-          {
-            status: 429,
-            headers: {
-              'Retry-After': String(Math.max(retryAfterSec, 60)),
-              'X-RateLimit-Reset': String(Math.ceil(blocked.resetAt / 1000)),
-            },
-          },
-        )
-      }
-    }
-
-    // Validate and normalize OTP code - strip spaces and non-digits
+    // Validate and normalize OTP code
     const normalizedCode = String(code || '').replace(/\D/g, '').slice(0, 6)
     if (normalizedCode.length !== 6) {
       return NextResponse.json({ message: 'Kode OTP harus 6 digit.' }, { status: 400 })
@@ -87,24 +51,10 @@ export async function POST(req: NextRequest) {
     }
 
     const expectedHash = sha256(normalizedCode)
-    console.log('[OTP Verify] Hash:', expectedHash)
-    console.log('[OTP Verify] Active OTPs count:', activeOtps.length)
-    if (activeOtps.length > 0) {
-      console.log('[OTP Verify] Stored hashes:', activeOtps.map(o => o.codeHash))
-    }
     const matchedOtp = activeOtps.find((item) => item.codeHash === expectedHash)
 
     if (!matchedOtp) {
-      // Record failed attempt
-      if (normalizedEmail) {
-        recordFailedOtp(normalizedEmail)
-      }
       return NextResponse.json({ message: 'Kode OTP salah.' }, { status: 400 })
-    }
-
-    // Clear failed attempts on success
-    if (normalizedEmail) {
-      clearFailedOtp(normalizedEmail)
     }
 
     await db.loginOtp.update({
@@ -123,8 +73,8 @@ export async function POST(req: NextRequest) {
     }
 
     const isProd = process.env.NODE_ENV === 'production'
-    const cookieStore = await cookies()
-    cookieStore.set(OTP_COOKIE_NAME, userId, {
+    const { cookies: cookieStore } = await import('next/headers')
+    cookieStore().set(OTP_COOKIE_NAME, userId!, {
       httpOnly: true,
       sameSite: isProd ? 'none' : 'lax',
       secure: isProd,
@@ -132,7 +82,7 @@ export async function POST(req: NextRequest) {
       path: '/',
     })
 
-    cookieStore.set(EMAIL_VERIFIED_COOKIE_NAME, userId, {
+    cookieStore().set(EMAIL_VERIFIED_COOKIE_NAME, userId!, {
       httpOnly: true,
       sameSite: isProd ? 'none' : 'lax',
       secure: isProd,
