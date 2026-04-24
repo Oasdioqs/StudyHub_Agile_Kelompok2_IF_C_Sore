@@ -15,8 +15,6 @@ if (process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN) {
       'ENOTFOUND',
     ],
 
-    // Disable source maps upload (already configured in next.config.js)
-    hideSourceMaps: true,
     disableLogger: true,
   })
 }
