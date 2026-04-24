@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getMessaging, getToken, onMessage, type Messaging } from 'firebase/messaging'
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from '@firebase/app-check'
 
 // Firebase config from environment variables (all are public-safe, used client-side)
 const firebaseConfig = {
@@ -15,11 +16,40 @@ const firebaseConfig = {
 const app = getApps().length > 0 ? getApp() : (firebaseConfig.apiKey ? initializeApp(firebaseConfig) : null)
 export const firebaseApp = app
 
+// Initialize Firebase App Check for additional security
+// This helps protect Firebase resources from abuse
+let appCheckInitialized = false
+
+export function initializeFirebaseAppCheck() {
+  if (typeof window === 'undefined' || !firebaseApp || appCheckInitialized) return
+
+  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+  if (!recaptchaSiteKey) {
+    console.warn('[Firebase] App Check disabled: NEXT_PUBLIC_RECAPTCHA_SITE_KEY not set')
+    return
+  }
+
+  try {
+    initializeAppCheck(firebaseApp, {
+      provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    })
+    appCheckInitialized = true
+    console.log('[Firebase] App Check initialized')
+  } catch (err) {
+    console.error('[Firebase] App Check initialization failed:', err)
+  }
+}
+
 let messagingInstance: Messaging | null = null
 
 export function getFirebaseMessaging(): Messaging | null {
   if (typeof window === 'undefined') return null
   if (!firebaseApp) return null
+
+  // Initialize App Check on first use
+  initializeFirebaseAppCheck()
+
   if (!messagingInstance) {
     messagingInstance = getMessaging(firebaseApp)
   }
