@@ -13,7 +13,7 @@ import {
   RATE_LIMITS,
   rateLimitResponse,
 } from '@/lib/rate-limit'
-import { sanitizeEmail, sanitizeOtpCode } from '@/lib/sanitize'
+import { sanitizeEmail } from '@/lib/sanitize'
 
 const OTP_COOKIE_NAME = 'otp_verified_for'
 const EMAIL_VERIFIED_COOKIE_NAME = 'email_verified_for'
@@ -50,9 +50,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const sanitizedCode = sanitizeOtpCode(code || '')
-  if (!sanitizedCode) {
-    return NextResponse.json({ message: 'Kode OTP tidak valid.' }, { status: 400 })
+  // Validate and normalize OTP code - strip spaces and non-digits
+  const normalizedCode = String(code || '').replace(/\D/g, '').slice(0, 6)
+  if (normalizedCode.length !== 6) {
+    return NextResponse.json({ message: 'Kode OTP harus 6 digit.' }, { status: 400 })
   }
 
   let userId: string | null = null
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'OTP tidak valid atau sudah expired.' }, { status: 400 })
   }
 
-  const expectedHash = sha256(sanitizedCode)
+  const expectedHash = sha256(normalizedCode)
   const matchedOtp = activeOtps.find((item) => item.codeHash === expectedHash)
 
   if (!matchedOtp) {
