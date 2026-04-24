@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
-import { getMessaging, getToken, onMessage, type Messaging } from 'firebase/messaging'
-import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from '@firebase/app-check'
+import { getMessaging, getToken as getMessagingToken, onMessage, type Messaging } from 'firebase/messaging'
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken as getAppCheckToken } from '@firebase/app-check'
 
 // Firebase config from environment variables (all are public-safe, used client-side)
 const firebaseConfig = {
@@ -73,7 +73,7 @@ export async function requestAndRegisterToken(): Promise<string | null> {
     const messaging = getFirebaseMessaging()
     if (!messaging) return null
 
-    const token = await getToken(messaging, {
+    const token = await getMessagingToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
       serviceWorkerRegistration: registration,
     })
