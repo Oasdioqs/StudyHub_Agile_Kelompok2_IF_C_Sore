@@ -498,7 +498,7 @@ Didistribusikan di bawah **MIT License** — bebas digunakan, dimodifikasi, dan 
 
 | Nama | Role | NIM |
 |------|------|--------|
-|  | Project Lead / Full-stack Dev | kelvin.chen996@gmail.com |
+| Raihan Ali | Project Leader | 221111701 |
 | Bryan Chandra | Full-Stack Developer | 241110637 |
 | Steven Aurelio | Analyst | 201111110 |
 | Stevania| Anggota | 241111218 |
